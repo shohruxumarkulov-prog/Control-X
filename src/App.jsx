@@ -1324,7 +1324,26 @@ export default function WorkforceApp() {
   const [usersData, setUsersData] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [advances, setAdvances] = useState({});
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUserState] = useState(() => {
+    try {
+      const raw = localStorage.getItem("current-user");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  // Wraps setCurrentUser so the logged-in session survives a page reload
+  // (e.g. pull-to-refresh) instead of dropping the person back to the
+  // login screen every time.
+  function setCurrentUser(user) {
+    setCurrentUserState(user);
+    try {
+      if (user) localStorage.setItem("current-user", JSON.stringify(user));
+      else localStorage.removeItem("current-user");
+    } catch (e) {
+      // ignore storage errors (e.g. private browsing)
+    }
+  }
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
 
@@ -1386,6 +1405,21 @@ export default function WorkforceApp() {
       await safeSet("users-data", JSON.stringify(usersVal));
     }
     setUsersData(usersVal);
+
+    // If this device had a saved session but the account no longer exists
+    // (e.g. deleted or renamed from another device), sign out safely
+    // instead of showing a broken/empty screen.
+    setCurrentUserState((prevUser) => {
+      if (!prevUser) return prevUser;
+      const stillValid = prevUser.role === "admin"
+        ? !!usersVal.admins[prevUser.username]
+        : (usersVal.employees || []).some((e) => e.id === prevUser.id);
+      if (!stillValid) {
+        try { localStorage.removeItem("current-user"); } catch (e) {}
+        return null;
+      }
+      return prevUser;
+    });
 
     try {
       const rawAtt = await safeGet("attendance-data");
