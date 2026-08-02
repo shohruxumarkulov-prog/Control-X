@@ -86,6 +86,7 @@ const STR = {
   noData: { uz: "Ma'lumot yo'q", ru: "Нет данных", en: "No data" },
   myWorkedDays: { uz: "Ishlagan kunlarim", ru: "Мои отработанные дни", en: "My worked days" },
   noAttendanceYet: { uz: "Hali davomat belgilanmagan", ru: "Посещаемость ещё не отмечена", en: "No attendance marked yet" },
+  futureDateWarning: { uz: "Hali kelmagan sanaga davomat belgilab bo'lmaydi", ru: "Нельзя отметить посещаемость на будущую дату", en: "You can't mark attendance for a future date" },
   myAdvances: { uz: "Avanslarim", ru: "Мои авансы", en: "My advances" },
   noAdvancesYet: { uz: "Hali avans olmagansiz", ru: "Вы ещё не получали аванс", en: "You haven't taken an advance yet" },
   statWorkedDays: { uz: "Ishlagan kunlar", ru: "Отработано дней", en: "Days worked" },
@@ -1035,7 +1036,7 @@ function AdminApp({
                 <Calendar size={15} /> {t("markAttendanceHeader")}
               </div>
               <label className="text-[var(--text-muted)]">
-                <input type="date" value={attDate} onChange={(e) => setAttDate(e.target.value)} className="bg-transparent text-[var(--text-secondary)] text-xs outline-none" />
+                <input type="date" max={todayISO()} value={attDate} onChange={(e) => setAttDate(e.target.value)} className="bg-transparent text-[var(--text-secondary)] text-xs outline-none" />
               </label>
             </div>
             <div className="flex items-center gap-1.5">
@@ -1053,21 +1054,34 @@ function AdminApp({
                   const weekday = dt.toLocaleDateString(localeTag, { weekday: "short" });
                   const isToday = d === todayISO();
                   const isSelected = d === attDate;
-                  const style = isToday
-                    ? { backgroundColor: "#5cbf8f", color: "#0e1712", boxShadow: isSelected ? `0 0 0 2px var(--bg-card), 0 0 0 4px ${accent}` : "none" }
-                    : isSelected
-                      ? { backgroundColor: accent, color: "#12161c" }
-                      : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" };
+                  const isFuture = d > todayISO();
+                  const markedCount = myEmployees.filter((emp) => attendance[emp.id]?.[d] !== undefined).length;
+                  const dotColor = myEmployees.length === 0 || isFuture
+                    ? "transparent"
+                    : markedCount === 0
+                      ? "var(--border-input)"
+                      : markedCount < myEmployees.length
+                        ? "#d9b23c"
+                        : "#5cbf8f";
+                  const style = isFuture
+                    ? { backgroundColor: "var(--bg-app)", color: "var(--text-faint)", border: "1px solid var(--border-input)", opacity: 0.45 }
+                    : isToday
+                      ? { backgroundColor: "#5cbf8f", color: "#0e1712", boxShadow: isSelected ? `0 0 0 2px var(--bg-card), 0 0 0 4px ${accent}` : "none" }
+                      : isSelected
+                        ? { backgroundColor: accent, color: "#12161c" }
+                        : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" };
                   return (
                     <button
                       key={d}
                       type="button"
+                      disabled={isFuture}
                       onClick={() => setAttDate(d)}
-                      className="flex flex-col items-center justify-center py-2 rounded-lg text-xs transition-colors"
+                      className="flex flex-col items-center justify-center py-2 rounded-lg text-xs transition-colors disabled:cursor-not-allowed"
                       style={style}
                     >
                       <span className="text-[10px] opacity-80 capitalize">{weekday}</span>
                       <span className="text-sm font-semibold">{dt.getDate()}</span>
+                      <span className="w-1.5 h-1.5 rounded-full mt-1" style={{ backgroundColor: dotColor }} />
                     </button>
                   );
                 })}
@@ -1087,8 +1101,12 @@ function AdminApp({
             {myEmployees.length === 0 && (
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
             )}
+            {myEmployees.length > 0 && attDate > todayISO() && (
+              <p className="text-[#d9b23c] text-xs text-center py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">{t("futureDateWarning")}</p>
+            )}
             {myEmployees.map((emp) => {
               const st = attendance[emp.id]?.[attDate];
+              const isFuture = attDate > todayISO();
               return (
                 <div key={emp.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5">
                   <div className="flex items-center gap-2.5 mb-3">
@@ -1101,24 +1119,27 @@ function AdminApp({
                   <div className="grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
+                      disabled={isFuture}
                       onClick={() => markAttendance(emp.id, 1)}
-                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors"
+                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       style={st === 1 ? { backgroundColor: "#5cbf8f", color: "#0e1712" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
                     >
                       <CheckCircle2 size={13} /> {t("fullDay")}
                     </button>
                     <button
                       type="button"
+                      disabled={isFuture}
                       onClick={() => markAttendance(emp.id, 0.5)}
-                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors"
+                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       style={st === 0.5 ? { backgroundColor: "#d9b23c", color: "#1a1608" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
                     >
                       <Calendar size={13} /> {t("halfDay")}
                     </button>
                     <button
                       type="button"
+                      disabled={isFuture}
                       onClick={() => markAttendance(emp.id, 0)}
-                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors"
+                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       style={st === 0 ? { backgroundColor: "#e2685f", color: "#1c0e0c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
                     >
                       <XCircle size={13} /> {t("absent")}
@@ -1493,6 +1514,7 @@ export default function WorkforceApp() {
   }
 
   async function markAttendance(empId, status) {
+    if (attDate > todayISO()) return; // safety guard — future dates can't be marked
     const dayMap = { ...(attendance[empId] || {}) };
     if (dayMap[attDate] === status) {
       delete dayMap[attDate]; // clicking the active status again clears it
