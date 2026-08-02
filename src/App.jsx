@@ -278,6 +278,34 @@ function Field({ label, value, onChange, type = "text" }) {
   );
 }
 
+// A number input that groups digits by thousands as you type (1 000 000),
+// so entering large sums of money doesn't require carefully counting zeros.
+// `value`/`onChange` still carry the plain digit string (e.g. "1000000") —
+// only the on-screen display is formatted, so all the existing amount math
+// elsewhere in the app keeps working unchanged.
+function MoneyField({ label, value, onChange, suffix }) {
+  const digits = String(value || "").replace(/\D/g, "");
+  const display = digits ? Number(digits).toLocaleString("uz-UZ") : "";
+  return (
+    <div>
+      <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{label}</label>
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={display}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
+          placeholder="0"
+          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors`}
+        />
+        {suffix && (
+          <span className="absolute right-3 top-0 h-full flex items-center text-[var(--text-muted)] text-xs">{suffix}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Stat({ label, value, tone = "default", icon }) {
   const toneMap = {
     default: "text-[var(--text-primary)]",
@@ -1004,7 +1032,7 @@ function AdminApp({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label={t("fullName")} value={newEmp.name} onChange={(v) => setNewEmp({ ...newEmp, name: v })} />
-                <Field label={t("dailyWage")} type="number" value={newEmp.dailyWage} onChange={(v) => setNewEmp({ ...newEmp, dailyWage: v })} />
+                <MoneyField label={t("dailyWage")} value={newEmp.dailyWage} onChange={(v) => setNewEmp({ ...newEmp, dailyWage: v })} suffix="so'm" />
                 <Field label={t("login")} value={newEmp.username} onChange={(v) => setNewEmp({ ...newEmp, username: v })} />
                 <Field label={t("password")} type="password" value={newEmp.password} onChange={(v) => setNewEmp({ ...newEmp, password: v })} />
               </div>
@@ -1188,7 +1216,7 @@ function AdminApp({
                   {myEmployees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
               </div>
-              <Field label={t("amount")} type="number" value={advForm.amount} onChange={(v) => setAdvForm({ ...advForm, amount: v })} />
+              <MoneyField label={t("amount")} value={advForm.amount} onChange={(v) => setAdvForm({ ...advForm, amount: v })} suffix="so'm" />
               <Field label={t("date")} type="date" value={advForm.date} onChange={(v) => setAdvForm({ ...advForm, date: v })} />
               <div className="col-span-2">
                 <Field label={t("note")} value={advForm.note} onChange={(v) => setAdvForm({ ...advForm, note: v })} />
