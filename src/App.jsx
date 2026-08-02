@@ -14,6 +14,21 @@ const fmtDays = (n) => {
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 };
 
+// Finds the daily wage that was in effect on a given date, using the
+// employee's wage history (each entry marks the date a new rate started).
+// Falls back to the employee's current dailyWage if there's no history yet
+// (older data created before this feature existed).
+function wageForDate(emp, date) {
+  const history = emp.wageHistory;
+  if (!Array.isArray(history) || history.length === 0) return Number(emp.dailyWage || 0);
+  let applicable = history[0];
+  for (const entry of history) {
+    if (entry.date <= date) applicable = entry;
+    else break;
+  }
+  return Number(applicable.wage);
+}
+
 // ---------- i18n ----------
 const LANGS = [
   { code: "uz", label: "O'zbekcha" },
@@ -1398,7 +1413,7 @@ function EmployeeApp({
                   {date} {v === 0.5 && <span className="text-[10px] text-[#d9b23c]">({t("halfDay")})</span>}
                   {v === 0 && <span className="text-[10px] text-[#e2685f]">({t("absent")})</span>}
                 </span>
-                <span className={v === 0 ? "text-[#e2685f] text-xs" : "text-[var(--text-muted)] text-xs"}>{fmt(v * s.emp.dailyWage)}</span>
+                <span className={v === 0 ? "text-[#e2685f] text-xs" : "text-[var(--text-muted)] text-xs"}>{fmt(v * wageForDate(s.emp, date))}</span>
               </div>
             ))}
           </div>
@@ -1643,12 +1658,13 @@ export default function WorkforceApp() {
     const emp = usersData.employees.find((x) => x.id === empId);
     if (!emp) return null;
     const att = attendance[empId] || {};
-    const workedDays = Object.values(att).reduce((sum, v) => {
-      if (typeof v === "number") return sum + v;
-      if (v === true) return sum + 1; // legacy data before half-day support
-      return sum;
-    }, 0);
-    const totalWage = workedDays * Number(emp.dailyWage);
+    let workedDays = 0;
+    let totalWage = 0;
+    for (const [date, raw] of Object.entries(att)) {
+      const v = typeof raw === "number" ? raw : (raw === true ? 1 : 0); // legacy data before half-day support
+      workedDays += v;
+      totalWage += v * wageForDate(emp, date);
+    }
     const advList = advances[empId] || [];
     const totalAvans = advList.filter((a) => a.type !== "salary").reduce((sum, a) => sum + Number(a.amount), 0);
     const totalSalaryPaid = advList.filter((a) => a.type === "salary").reduce((sum, a) => sum + Number(a.amount), 0);
@@ -1667,12 +1683,14 @@ export default function WorkforceApp() {
       return;
     }
     const id = "e" + Date.now();
+    const wage = Number(newEmp.dailyWage);
     const updated = {
       ...usersData,
       employees: [...usersData.employees, {
         id, name: newEmp.name, username: newEmp.username,
-        password: newEmp.password, dailyWage: Number(newEmp.dailyWage), avatar: null,
+        password: newEmp.password, dailyWage: wage, avatar: null,
         owner: currentUser.username,
+        wageHistory: [{ date: todayISO(), wage }],
       }],
     };
     await persistUsers(updated);
@@ -1688,10 +1706,23 @@ export default function WorkforceApp() {
     if (advEmp === id) setAdvEmp("");
   }
 
+  // Changing the wage only affects days marked from today onward — days
+  // already worked keep the rate that was active when they were marked,
+  // by recording each change in the employee's wage history.
   async function updateEmployeeWage(id, newWage) {
     const target = usersData.employees.find((x) => x.id === id);
     if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
-    const employees = usersData.employees.map((e) => (e.id === id ? { ...e, dailyWage: newWage } : e));
+    const today = todayISO();
+    // If this employee has no wage history yet (created before this
+    // feature existed), seed it with their old rate starting from the
+    // very beginning — so past days keep being calculated at the old
+    // rate, and only today onward uses the new one.
+    const history = Array.isArray(target.wageHistory) && target.wageHistory.length > 0
+      ? target.wageHistory
+      : [{ date: "2000-01-01", wage: target.dailyWage }];
+    const withoutToday = history.filter((h) => h.date !== today);
+    const newHistory = [...withoutToday, { date: today, wage: newWage }].sort((a, b) => (a.date < b.date ? -1 : 1));
+    const employees = usersData.employees.map((e) => (e.id === id ? { ...e, dailyWage: newWage, wageHistory: newHistory } : e));
     await persistUsers({ ...usersData, employees });
   }
 
