@@ -841,23 +841,15 @@ function ProfileDrawer({
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--bg-panel)] z-10">
-          <button type="button" onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" aria-label={t("profile")}>
-            <Menu size={20} />
+        <div className="flex items-center justify-end px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--bg-panel)] z-10">
+          <button
+            type="button"
+            onClick={() => setMode(mode === "dark" ? "light" : "dark")}
+            className="text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
+            aria-label={t("themeColor")}
+          >
+            {mode === "dark" ? <Moon size={20} /> : <Sun size={20} />}
           </button>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setMode(mode === "dark" ? "light" : "dark")}
-              className="text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
-              aria-label={t("themeColor")}
-            >
-              {mode === "dark" ? <Moon size={19} /> : <Sun size={19} />}
-            </button>
-            <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-              <ChevronUp size={19} />
-            </button>
-          </div>
         </div>
 
         <div className="px-5 pt-5">
