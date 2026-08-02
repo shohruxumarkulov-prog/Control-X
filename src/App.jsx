@@ -3,7 +3,8 @@ import {
   Users, Calendar, Wallet, LogOut, Plus, Trash2, CheckCircle2,
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
-  Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight
+  Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
+  Menu, ChevronUp, UserX
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
@@ -164,6 +165,10 @@ const STR = {
   createAccountBtn: { uz: "Boshqaruvchi bo'lib ro'yxatdan o'tish", ru: "Зарегистрироваться руководителем", en: "Register as manager" },
   alreadyHaveAccount: { uz: "Mavjud hisobga kirish", ru: "Войти в существующий аккаунт", en: "Sign in to an existing account" },
   newHere: { uz: "Birinchi marta kiryapsizmi?", ru: "Впервые здесь?", en: "First time here?" },
+  deleteAccount: { uz: "Akkauntni o'chirish", ru: "Удалить аккаунт", en: "Delete account" },
+  confirmDeleteAccountAdmin: { uz: "Rostdan ham akkauntingizni o'chirmoqchimisiz? Barcha ishchilaringiz, davomat va avans tarixi ham butunlay o'chib ketadi.", ru: "Точно удалить аккаунт? Все ваши сотрудники, посещаемость и авансы тоже будут удалены навсегда.", en: "Really delete your account? All your employees, attendance, and advance history will be permanently deleted too." },
+  confirmDeleteAccountEmployee: { uz: "Rostdan ham akkauntingizni o'chirmoqchimisiz? Davomat va avans tarixingiz ham butunlay o'chib ketadi.", ru: "Точно удалить аккаунт? Ваша посещаемость и авансы тоже будут удалены навсегда.", en: "Really delete your account? Your attendance and advance history will be permanently deleted too." },
+  yesDeleteAccount: { uz: "Ha, akkauntni o'chirish", ru: "Да, удалить аккаунт", en: "Yes, delete account" },
 };
 
 function makeT(lang) {
@@ -761,7 +766,7 @@ function AccordionRow({ icon, label, valueHint, isOpen, onToggle, children }) {
 }
 
 function ProfileDrawer({
-  open, onClose, me, roleLabel,
+  open, onClose, me, roleLabel, isAdmin, onDeleteAccount,
   changeOwnCredentials, updateAvatar,
   accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
@@ -774,6 +779,7 @@ function ProfileDrawer({
   const [newPw2, setNewPw2] = useState("");
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [confirmDeleteAcc, setConfirmDeleteAcc] = useState(false);
 
   function toggle(id) {
     setSection((cur) => (cur === id ? null : id));
@@ -836,33 +842,45 @@ function ProfileDrawer({
         }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--bg-panel)] z-10">
-          <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
-            <Settings size={15} /> {t("profile")}
-          </div>
-          <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-            <X size={18} />
+          <button type="button" onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" aria-label={t("profile")}>
+            <Menu size={20} />
           </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setMode(mode === "dark" ? "light" : "dark")}
+              className="text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
+              aria-label={t("themeColor")}
+            >
+              {mode === "dark" ? <Moon size={19} /> : <Sun size={19} />}
+            </button>
+            <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+              <ChevronUp size={19} />
+            </button>
+          </div>
         </div>
 
         <div className="px-5 pt-5">
-          {/* Profile identity + avatar */}
-          <div className="flex flex-col items-center text-center pb-5">
-            <div className="relative">
-              <Avatar src={me.avatar} name={me.name} size={76} />
+          {/* Profile identity + avatar — side by side */}
+          <div className="flex items-center gap-3.5 pb-5">
+            <div className="relative shrink-0">
+              <Avatar src={me.avatar} name={me.name} size={56} />
               <button
                 type="button"
                 onClick={() => fileRef.current && fileRef.current.click()}
                 disabled={avatarBusy}
-                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center border-2"
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center border-2"
                 style={{ backgroundColor: accent, color: "#12161c", borderColor: "var(--bg-panel)" }}
                 aria-label={t("changePhoto")}
               >
-                <Camera size={13} />
+                <Camera size={11} />
               </button>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
             </div>
-            <div className="text-[var(--text-primary)] text-sm font-semibold mt-3">{me.name}</div>
-            <div className="text-[var(--text-muted)] text-xs">{roleLabel}</div>
+            <div className="min-w-0">
+              <div className="text-[var(--text-primary)] text-base font-semibold truncate">{me.name}</div>
+              <div className="text-[var(--text-muted)] text-sm truncate">{roleLabel}</div>
+            </div>
           </div>
         </div>
 
@@ -997,7 +1015,40 @@ function ProfileDrawer({
             </button>
           </AccordionRow>
         </div>
-        <div className="h-5" />
+
+        <div className="px-5 pt-2 pb-6">
+          {!confirmDeleteAcc ? (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteAcc(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[var(--bad-soft)] text-[var(--bad)] text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              <UserX size={14} /> {t("deleteAccount")}
+            </button>
+          ) : (
+            <div className="bg-[var(--bad-soft)] border border-[var(--bad)]/30 rounded-lg p-3.5">
+              <p className="text-[var(--bad)] text-xs mb-2.5">
+                {isAdmin ? t("confirmDeleteAccountAdmin") : t("confirmDeleteAccountEmployee")}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={onDeleteAccount}
+                  className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                >
+                  {t("yesDeleteAccount")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteAcc(false)}
+                  className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+                >
+                  {t("cancel")}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
@@ -1010,7 +1061,7 @@ function AdminApp({
   newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
-  changeOwnCredentials, updateAvatar, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1064,6 +1115,8 @@ function AdminApp({
         onClose={() => setDrawerOpen(false)}
         me={{ name: currentUser.username, username: currentUser.username, password: myAdmin.password, avatar: myAdmin.avatar }}
         roleLabel={t("adminPanel")}
+        isAdmin={true}
+        onDeleteAccount={deleteOwnAccount}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
         accent={accent} setAccent={setAccent}
@@ -1370,7 +1423,7 @@ function AdminApp({
 // ---------- EMPLOYEE ----------
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
-  changeOwnCredentials, updateAvatar, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { t } = useApp();
@@ -1386,6 +1439,8 @@ function EmployeeApp({
         onClose={() => setDrawerOpen(false)}
         me={{ name: s.emp.name, username: s.emp.username, password: s.emp.password, avatar: s.emp.avatar }}
         roleLabel={t("employeePanel")}
+        isAdmin={false}
+        onDeleteAccount={deleteOwnAccount}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
         accent={accent} setAccent={setAccent}
@@ -1797,6 +1852,28 @@ export default function WorkforceApp() {
     return {};
   }
 
+  // Deletes the currently logged-in account. Admins take their own
+  // employees (and those employees' attendance/advance history) down
+  // with them; employees just remove their own record.
+  async function deleteOwnAccount() {
+    if (!currentUser) return;
+    if (currentUser.role === "admin") {
+      const admins = { ...usersData.admins };
+      delete admins[currentUser.username];
+      const ownedIds = usersData.employees.filter((e) => e.owner === currentUser.username).map((e) => e.id);
+      const employees = usersData.employees.filter((e) => e.owner !== currentUser.username);
+      await persistUsers({ ...usersData, admins, employees });
+      const att2 = { ...attendance }; ownedIds.forEach((id) => delete att2[id]); await persistAttendance(att2);
+      const adv2 = { ...advances }; ownedIds.forEach((id) => delete adv2[id]); await persistAdvances(adv2);
+    } else {
+      const employees = usersData.employees.filter((e) => e.id !== currentUser.id);
+      await persistUsers({ ...usersData, employees });
+      const att2 = { ...attendance }; delete att2[currentUser.id]; await persistAttendance(att2);
+      const adv2 = { ...advances }; delete adv2[currentUser.id]; await persistAdvances(adv2);
+    }
+    logout();
+  }
+
   async function updateAvatar(dataUrl) {
     if (!currentUser) return;
     if (currentUser.role === "admin") {
@@ -1851,6 +1928,7 @@ export default function WorkforceApp() {
         deleteAdvance={deleteAdvance}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
+        deleteOwnAccount={deleteOwnAccount}
         accent={accent} setAccent={setAccent}
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
@@ -1866,6 +1944,7 @@ export default function WorkforceApp() {
         onLogout={logout}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
+        deleteOwnAccount={deleteOwnAccount}
         accent={accent} setAccent={setAccent}
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
