@@ -50,7 +50,7 @@ const STR = {
   copy: { uz: "Nusxalash", ru: "Копировать", en: "Copy" },
   copied: { uz: "Nusxalandi", ru: "Скопировано", en: "Copied" },
   day: { uz: "Kun", ru: "Дни", en: "Days" },
-  advance: { uz: "Avans", ru: "Аванс", en: "Advance" },
+  advance: { uz: "To'langan", ru: "Выплачено", en: "Paid" },
   remaining: { uz: "Qoldiq", ru: "Остаток", en: "Remaining" },
   deleteEmployee: { uz: "Ishchini o'chirish", ru: "Удалить сотрудника", en: "Delete employee" },
   confirmDelete: { uz: "Rostdan ham {name}ni o'chirmoqchimisiz? Davomat va avans tarixi ham butunlay o'chib ketadi.", ru: "Точно удалить {name}? История посещаемости и авансов тоже удалится.", en: "Really delete {name}? Attendance and advance history will be deleted too." },
@@ -71,7 +71,10 @@ const STR = {
   statusAbsent: { uz: "kelmagan", ru: "отсутствовал", en: "absent" },
   statusNone: { uz: "belgilanmagan", ru: "не отмечено", en: "not marked" },
   totalWorkedDays: { uz: "Jami ishlagan kunlar:", ru: "Всего отработано дней:", en: "Total days worked:" },
-  giveAdvanceHeader: { uz: "Avans berish", ru: "Выдать аванс", en: "Give advance" },
+  giveAdvanceHeader: { uz: "Avans / to'lov berish", ru: "Выдать аванс / оплату", en: "Give an advance / payment" },
+  typeAvans: { uz: "Avans", ru: "Аванс", en: "Advance" },
+  typeSalary: { uz: "Ish haqi to'lovi", ru: "Выплата зарплаты", en: "Salary payment" },
+  addSalaryPayment: { uz: "To'lovni qo'shish", ru: "Добавить выплату", en: "Add payment" },
   amount: { uz: "Summa (so'm)", ru: "Сумма (сум)", en: "Amount" },
   note: { uz: "Izoh (ixtiyoriy)", ru: "Заметка (необязательно)", en: "Note (optional)" },
   addAdvance: { uz: "Avans qo'shish", ru: "Добавить аванс", en: "Add advance" },
@@ -81,7 +84,7 @@ const STR = {
   colEmployee: { uz: "Ishchi", ru: "Сотрудник", en: "Employee" },
   colDays: { uz: "Kun", ru: "Дни", en: "Days" },
   colCalculated: { uz: "Hisoblangan", ru: "Начислено", en: "Calculated" },
-  colAdvance: { uz: "Avans", ru: "Аванс", en: "Advance" },
+  colAdvance: { uz: "To'langan", ru: "Выплачено", en: "Paid" },
   colRemaining: { uz: "Qoldiq", ru: "Остаток", en: "Remaining" },
   noData: { uz: "Ma'lumot yo'q", ru: "Нет данных", en: "No data" },
   myWorkedDays: { uz: "Ishlagan kunlarim", ru: "Мои отработанные дни", en: "My worked days" },
@@ -1158,6 +1161,24 @@ function AdminApp({
             <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold mb-4">
               <Wallet size={15} /> {t("giveAdvanceHeader")}
             </div>
+            <div className="grid grid-cols-2 gap-1.5 mb-3">
+              <button
+                type="button"
+                onClick={() => setAdvForm({ ...advForm, type: "avans" })}
+                className="py-2 rounded-lg text-xs font-medium transition-colors"
+                style={(advForm.type || "avans") === "avans" ? { backgroundColor: accent, color: "#12161c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+              >
+                {t("typeAvans")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdvForm({ ...advForm, type: "salary" })}
+                className="py-2 rounded-lg text-xs font-medium transition-colors"
+                style={advForm.type === "salary" ? { backgroundColor: accent, color: "#12161c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+              >
+                {t("typeSalary")}
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="col-span-2">
                 <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("employee")}</label>
@@ -1174,7 +1195,7 @@ function AdminApp({
               </div>
             </div>
             <button type="button" onClick={addAdvance} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
-              <Plus size={14} /> {t("addAdvance")}
+              <Plus size={14} /> {(advForm.type === "salary") ? t("addSalaryPayment") : t("addAdvance")}
             </button>
           </div>
 
@@ -1187,6 +1208,12 @@ function AdminApp({
                   <div key={a.id} className="flex items-center justify-between text-sm py-1.5">
                     <div>
                       <span className="text-[var(--text-primary)]">{fmt(a.amount)}</span>
+                      <span
+                        className="text-[9px] uppercase tracking-wide ml-2 px-1.5 py-0.5 rounded"
+                        style={a.type === "salary" ? { backgroundColor: "rgba(92,191,143,0.15)", color: "#5cbf8f" } : { backgroundColor: "rgba(217,178,60,0.15)", color: "#d9b23c" }}
+                      >
+                        {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+                      </span>
                       <span className="text-[var(--text-muted)] text-xs ml-2">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
                     </div>
                     <button onClick={() => deleteAdvance(advEmp, a.id)} className="text-[var(--text-muted)] hover:text-[#e2685f]">
@@ -1252,7 +1279,6 @@ function EmployeeApp({
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
     .map(([date, v]) => [date, typeof v === "number" ? v : (v === true ? 1 : 0)])
-    .filter(([, v]) => v > 0)
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
 
   return (
@@ -1276,10 +1302,13 @@ function EmployeeApp({
         onLogout={onLogout}
         onTitleClick={() => setDrawerOpen(true)}
       >
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-2">
           <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
-          <Stat label={t("statTakenAdvance")} value={fmt(s.totalAdvance)} tone="bad" icon={<TrendingDown size={12} />} />
           <Stat label={t("statRemainingSalary")} value={fmt(s.remaining)} tone="good" icon={<Wallet size={12} />} />
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-6">
+          <Stat label={t("typeAvans")} value={fmt(s.totalAvans)} tone="bad" icon={<TrendingDown size={12} />} />
+          <Stat label={t("typeSalary")} value={fmt(s.totalSalaryPaid)} tone="bad" icon={<Wallet size={12} />} />
         </div>
 
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-5">
@@ -1292,10 +1321,15 @@ function EmployeeApp({
             {attDays.map(([date, v]) => (
               <div key={date} className="flex items-center justify-between text-sm py-1">
                 <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
-                  <CheckCircle2 size={13} className={v === 1 ? "text-[#5cbf8f]" : "text-[#d9b23c]"} />
+                  {v === 0 ? (
+                    <XCircle size={13} className="text-[#e2685f]" />
+                  ) : (
+                    <CheckCircle2 size={13} className={v === 1 ? "text-[#5cbf8f]" : "text-[#d9b23c]"} />
+                  )}
                   {date} {v === 0.5 && <span className="text-[10px] text-[#d9b23c]">({t("halfDay")})</span>}
+                  {v === 0 && <span className="text-[10px] text-[#e2685f]">({t("absent")})</span>}
                 </span>
-                <span className="text-[var(--text-muted)] text-xs">{fmt(v * s.emp.dailyWage)}</span>
+                <span className={v === 0 ? "text-[#e2685f] text-xs" : "text-[var(--text-muted)] text-xs"}>{fmt(v * s.emp.dailyWage)}</span>
               </div>
             ))}
           </div>
@@ -1307,7 +1341,15 @@ function EmployeeApp({
           <div className="space-y-2">
             {s.advList.slice().reverse().map((a) => (
               <div key={a.id} className="flex items-center justify-between text-sm py-1">
-                <span className="text-[var(--text-primary)]">{fmt(a.amount)}</span>
+                <span className="text-[var(--text-primary)] flex items-center gap-2">
+                  {fmt(a.amount)}
+                  <span
+                    className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded"
+                    style={a.type === "salary" ? { backgroundColor: "rgba(92,191,143,0.15)", color: "#5cbf8f" } : { backgroundColor: "rgba(217,178,60,0.15)", color: "#d9b23c" }}
+                  >
+                    {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+                  </span>
+                </span>
                 <span className="text-[var(--text-muted)] text-xs">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
               </div>
             ))}
@@ -1352,7 +1394,7 @@ export default function WorkforceApp() {
   const [empError, setEmpError] = useState("");
   const [attDate, setAttDate] = useState(todayISO());
   const [advEmp, setAdvEmp] = useState("");
-  const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "" });
+  const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "", type: "avans" });
   const [accent, setAccent] = useState(ACCENT_PRESETS[0].value);
   const [mode, setMode] = useState("dark");
   const [fontScale, setFontScale] = useState(100);
@@ -1539,8 +1581,10 @@ export default function WorkforceApp() {
     }, 0);
     const totalWage = workedDays * Number(emp.dailyWage);
     const advList = advances[empId] || [];
-    const totalAdvance = advList.reduce((sum, a) => sum + Number(a.amount), 0);
-    return { emp, workedDays, totalWage, totalAdvance, remaining: totalWage - totalAdvance, advList, att };
+    const totalAvans = advList.filter((a) => a.type !== "salary").reduce((sum, a) => sum + Number(a.amount), 0);
+    const totalSalaryPaid = advList.filter((a) => a.type === "salary").reduce((sum, a) => sum + Number(a.amount), 0);
+    const totalAdvance = totalAvans + totalSalaryPaid; // combined, kept for backward compatibility
+    return { emp, workedDays, totalWage, totalAdvance, totalAvans, totalSalaryPaid, remaining: totalWage - totalAdvance, advList, att };
   }
 
   async function addEmployee() {
@@ -1589,9 +1633,9 @@ export default function WorkforceApp() {
   async function addAdvance() {
     if (!advEmp || !advForm.amount) return;
     const list = advances[advEmp] ? [...advances[advEmp]] : [];
-    list.push({ id: "a" + Date.now(), amount: Number(advForm.amount), date: advForm.date, note: advForm.note });
+    list.push({ id: "a" + Date.now(), amount: Number(advForm.amount), date: advForm.date, note: advForm.note, type: advForm.type || "avans" });
     await persistAdvances({ ...advances, [advEmp]: list });
-    setAdvForm({ amount: "", date: todayISO(), note: "" });
+    setAdvForm({ amount: "", date: todayISO(), note: "", type: advForm.type || "avans" });
   }
 
   async function deleteAdvance(empId, advId) {
