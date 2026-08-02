@@ -29,6 +29,20 @@ function wageForDate(emp, date) {
   return Number(applicable.wage);
 }
 
+// An attendance entry can be a plain number/boolean (older data, before
+// per-entry wage snapshots existed) or an object { v, wage } (current
+// format). These two helpers read either shape safely.
+function attEntryStatus(raw) {
+  if (raw && typeof raw === "object") return raw.v;
+  if (typeof raw === "number") return raw;
+  if (raw === true) return 1;
+  return 0;
+}
+function attEntryWage(raw, emp, date) {
+  if (raw && typeof raw === "object" && typeof raw.wage === "number") return raw.wage;
+  return wageForDate(emp, date); // legacy fallback — best guess from wage history
+}
+
 // ---------- i18n ----------
 const LANGS = [
   { code: "uz", label: "O'zbekcha" },
@@ -1191,7 +1205,8 @@ function AdminApp({
               <p className="text-[#d9b23c] text-xs text-center py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">{t("futureDateWarning")}</p>
             )}
             {myEmployees.map((emp) => {
-              const st = attendance[emp.id]?.[attDate];
+              const st = attEntryStatus(attendance[emp.id]?.[attDate]);
+              const hasEntry = attendance[emp.id]?.[attDate] !== undefined;
               const isFuture = attDate > todayISO();
               return (
                 <div key={emp.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5">
@@ -1226,7 +1241,7 @@ function AdminApp({
                       disabled={isFuture}
                       onClick={() => markAttendance(emp.id, 0)}
                       className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={st === 0 ? { backgroundColor: "#e2685f", color: "#1c0e0c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+                      style={st === 0 && hasEntry ? { backgroundColor: "#e2685f", color: "#1c0e0c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
                     >
                       <XCircle size={13} /> {t("absent")}
                     </button>
@@ -1361,7 +1376,7 @@ function EmployeeApp({
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
-    .map(([date, v]) => [date, typeof v === "number" ? v : (v === true ? 1 : 0)])
+    .map(([date, raw]) => [date, attEntryStatus(raw), attEntryWage(raw, s.emp, date)])
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
 
   return (
@@ -1402,7 +1417,7 @@ function EmployeeApp({
           </div>
           {attDays.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAttendanceYet")}</p>}
           <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-            {attDays.map(([date, v]) => (
+            {attDays.map(([date, v, wage]) => (
               <div key={date} className="flex items-center justify-between text-sm py-1">
                 <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
                   {v === 0 ? (
@@ -1413,7 +1428,7 @@ function EmployeeApp({
                   {date} {v === 0.5 && <span className="text-[10px] text-[#d9b23c]">({t("halfDay")})</span>}
                   {v === 0 && <span className="text-[10px] text-[#e2685f]">({t("absent")})</span>}
                 </span>
-                <span className={v === 0 ? "text-[#e2685f] text-xs" : "text-[var(--text-muted)] text-xs"}>{fmt(v * wageForDate(s.emp, date))}</span>
+                <span className={v === 0 ? "text-[#e2685f] text-xs" : "text-[var(--text-muted)] text-xs"}>{fmt(v * wage)}</span>
               </div>
             ))}
           </div>
@@ -1661,9 +1676,9 @@ export default function WorkforceApp() {
     let workedDays = 0;
     let totalWage = 0;
     for (const [date, raw] of Object.entries(att)) {
-      const v = typeof raw === "number" ? raw : (raw === true ? 1 : 0); // legacy data before half-day support
+      const v = attEntryStatus(raw);
       workedDays += v;
-      totalWage += v * wageForDate(emp, date);
+      totalWage += v * attEntryWage(raw, emp, date);
     }
     const advList = advances[empId] || [];
     const totalAvans = advList.filter((a) => a.type !== "salary").reduce((sum, a) => sum + Number(a.amount), 0);
@@ -1729,10 +1744,16 @@ export default function WorkforceApp() {
   async function markAttendance(empId, status) {
     if (attDate > todayISO()) return; // safety guard — future dates can't be marked
     const dayMap = { ...(attendance[empId] || {}) };
-    if (dayMap[attDate] === status) {
+    const currentStatus = attEntryStatus(dayMap[attDate]);
+    if (dayMap[attDate] !== undefined && currentStatus === status) {
       delete dayMap[attDate]; // clicking the active status again clears it
     } else {
-      dayMap[attDate] = status;
+      // Snapshot today's wage rate right into the entry. This way, if the
+      // wage is changed later, everything already marked keeps the rate
+      // that was active the moment it was recorded — no matter which
+      // calendar date the attendance itself is for.
+      const emp = usersData.employees.find((e) => e.id === empId);
+      dayMap[attDate] = { v: status, wage: Number(emp ? emp.dailyWage : 0) };
     }
     await persistAttendance({ ...attendance, [empId]: dayMap });
   }
