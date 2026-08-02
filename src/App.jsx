@@ -3,7 +3,7 @@ import {
   Users, Calendar, Wallet, LogOut, Plus, Trash2, CheckCircle2,
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
-  Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon
+  Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
@@ -121,6 +121,13 @@ const STR = {
   backToEmployeeLogin: { uz: "Ishchi kirishiga qaytish", ru: "Назад ко входу сотрудника", en: "Back to employee sign in" },
   adminLoginTitle: { uz: "Boshqaruvchi kirishi", ru: "Вход руководителя", en: "Manager sign in" },
   employeeLoginTitle: { uz: "Ishchi kirishi", ru: "Вход сотрудника", en: "Employee sign in" },
+  registerTitle: { uz: "Yangi boshqaruvchi yaratish", ru: "Создать нового руководителя", en: "Create a new manager account" },
+  registerSubtitle: { uz: "O'z login-parolingizni o'ylab toping va o'z ishchilaringizni boshqaring", ru: "Придумайте свой логин и пароль и управляйте своими сотрудниками", en: "Choose your own username and password to manage your own employees" },
+  chooseLogin: { uz: "Login o'ylab toping", ru: "Придумайте логин", en: "Choose a username" },
+  choosePassword: { uz: "Parol o'ylab toping", ru: "Придумайте пароль", en: "Choose a password" },
+  createAccountBtn: { uz: "Boshqaruvchi bo'lib ro'yxatdan o'tish", ru: "Зарегистрироваться руководителем", en: "Register as manager" },
+  alreadyHaveAccount: { uz: "Mavjud hisobga kirish", ru: "Войти в существующий аккаунт", en: "Sign in to an existing account" },
+  newHere: { uz: "Birinchi marta kiryapsizmi?", ru: "Впервые здесь?", en: "First time here?" },
 };
 
 function makeT(lang) {
@@ -330,10 +337,62 @@ function Shell({ title, userName, avatar, onLogout, onTitleClick, bottomNav, chi
 }
 
 // ---------- LOGIN ----------
-function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit }) {
+function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister }) {
   const [showPassword, setShowPassword] = useState(false);
   const [asAdmin, setAsAdmin] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [regForm, setRegForm] = useState({ username: "", password: "", confirm: "" });
+  const [regError, setRegError] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const { accent, t } = useApp();
+
+  function submitRegister() {
+    setRegError("");
+    if (regForm.password !== regForm.confirm) {
+      setRegError(t("errPasswordMismatch"));
+      return;
+    }
+    const result = onRegister(regForm.username.trim(), regForm.password);
+    if (result && result.error) {
+      setRegError(result.error);
+    }
+  }
+
+  if (asAdmin && registering) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm">
+          <div className="flex items-center gap-2 justify-center mb-8">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
+              <ShieldCheck size={18} className="text-[#12161c]" />
+            </div>
+            <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
+          </div>
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7">
+            <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1">{t("registerTitle")}</h1>
+            <p className="text-[var(--text-muted)] text-sm mb-6">{t("registerSubtitle")}</p>
+            <div className="space-y-3.5">
+              <Field label={t("chooseLogin")} value={regForm.username} onChange={(v) => setRegForm({ ...regForm, username: v })} />
+              <Field label={t("choosePassword")} type="password" value={regForm.password} onChange={(v) => setRegForm({ ...regForm, password: v })} />
+              <Field label={t("repeatNewPassword")} type="password" value={regForm.confirm} onChange={(v) => setRegForm({ ...regForm, confirm: v })} />
+            </div>
+            {regError && <p className="text-[#e2685f] text-xs mt-3">{regError}</p>}
+            <button type="button" onClick={submitRegister} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
+              {t("createAccountBtn")}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setRegistering(false); setRegForm({ username: "", password: "", confirm: "" }); setRegError(""); }}
+              className="w-full mt-3 py-2 rounded-lg text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+            >
+              {t("alreadyHaveAccount")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -353,7 +412,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit }) {
             className="w-full mb-4 px-3.5 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
             value={loginForm.username}
             onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
             autoFocus
           />
           <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("password")}</label>
@@ -363,7 +422,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit }) {
               className="w-full px-3.5 py-2.5 pr-10 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
               value={loginForm.password}
               onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
             />
             <button
               type="button"
@@ -374,7 +433,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit }) {
             </button>
           </div>
           {loginError && <p className="text-[#e2685f] text-xs mb-2 mt-1">{loginError}</p>}
-          <button type="button" onClick={onSubmit} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
+          <button type="button" onClick={() => onSubmit(asAdmin)} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
             {t("loginBtn")}
           </button>
 
@@ -382,15 +441,18 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit }) {
             <>
               <button
                 type="button"
+                onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
+                className="w-full mt-3 py-2.5 rounded-lg border border-dashed border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition-colors flex items-center justify-center gap-1.5"
+              >
+                <UserPlus size={13} /> {t("registerTitle")}
+              </button>
+              <button
+                type="button"
                 onClick={() => { setAsAdmin(false); setLoginForm({ username: "", password: "" }); }}
-                className="w-full mt-3 py-2 rounded-lg text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+                className="w-full mt-2 py-2 rounded-lg text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
               >
                 {t("backToEmployeeLogin")}
               </button>
-              <p className="text-[var(--text-faint)] text-[11px] mt-2 leading-relaxed text-center">
-                {t("firstTimeHint")} <b className="text-[var(--text-secondary)]">admin / admin123</b>
-                <br />{t("changeLaterHint")}
-              </p>
             </>
           ) : (
             <button
@@ -432,17 +494,47 @@ function CopyButton({ text }) {
   );
 }
 
+function Lightbox({ src, name, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center px-6"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-5 right-5 w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center"
+        aria-label="Close"
+      >
+        <X size={18} />
+      </button>
+      <div onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-3">
+        {src ? (
+          <img src={src} alt={name} className="max-w-[85vw] max-h-[70vh] rounded-2xl object-contain shadow-2xl" />
+        ) : (
+          <Avatar src={null} name={name} size={180} />
+        )}
+        <div className="text-white text-sm font-medium">{name}</div>
+      </div>
+    </div>
+  );
+}
+
 function EmployeeRow({ emp, summary: s, onDelete }) {
   const [open, setOpen] = useState(false);
   const [reveal, setReveal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showPhoto, setShowPhoto] = useState(false);
   const { accent, t } = useApp();
 
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden">
+      {showPhoto && <Lightbox src={emp.avatar} name={emp.name} onClose={() => setShowPhoto(false)} />}
       <div className="p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Avatar src={emp.avatar} name={emp.name} size={36} />
+          <button type="button" onClick={() => setShowPhoto(true)} className="shrink-0" aria-label={t("details")}>
+            <Avatar src={emp.avatar} name={emp.name} size={36} />
+          </button>
           <div className="min-w-0">
             <div className="text-[var(--text-primary)] text-sm font-medium truncate">{emp.name}</div>
             <div className="text-[var(--text-muted)] text-xs mt-0.5">
@@ -466,8 +558,14 @@ function EmployeeRow({ emp, summary: s, onDelete }) {
         </div>
       </div>
 
+
       {open && (
         <div className="border-t border-[var(--border)] bg-[var(--bg-panel)] p-4 space-y-3">
+          <button type="button" onClick={() => setShowPhoto(true)} className="w-full flex flex-col items-center gap-2 pb-2">
+            <Avatar src={emp.avatar} name={emp.name} size={64} />
+            <div className="text-[var(--text-primary)] text-sm font-semibold">{emp.name}</div>
+          </button>
+
           <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1">
             <KeyRound size={12} /> {t("credentialsHeader")}
           </div>
@@ -809,20 +907,35 @@ function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
   newEmp, setNewEmp, empError, addEmployee, deleteEmployee,
-  attendance, attEmp, setAttEmp, attDate, setAttDate, markAttendance, clearAttendance,
+  attendance, attDate, setAttDate, markAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const { t } = useApp();
+  const myAdmin = usersData.admins[currentUser.username] || { password: "", avatar: null };
+  const myEmployees = usersData.employees.filter((e) => e.owner === currentUser.username);
   const tabs = [
     { id: "employees", label: t("navEmployees"), icon: <Users size={18} /> },
     { id: "attendance", label: t("navAttendance"), icon: <Calendar size={18} /> },
     { id: "advances", label: t("navAdvances"), icon: <Wallet size={18} /> },
     { id: "report", label: t("navReport"), icon: <ClipboardList size={18} /> },
   ];
-  const sEmp = attEmp ? summaryFor(attEmp) : null;
+  const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
+  const [weekOffset, setWeekOffset] = useState(0);
+  const dateStrip = (() => {
+    const today = new Date();
+    const day = today.getDay(); // 0 = Sunday ... 6 = Saturday
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset + weekOffset * 7);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+  })();
 
   const bottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 bg-[var(--bg-card)]/90 backdrop-blur-md border-t border-[var(--border)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -848,7 +961,7 @@ function AdminApp({
       <ProfileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        me={{ name: t("admin"), username: usersData.admin.username, password: usersData.admin.password, avatar: usersData.admin.avatar }}
+        me={{ name: currentUser.username, username: currentUser.username, password: myAdmin.password, avatar: myAdmin.avatar }}
         roleLabel={t("adminPanel")}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
@@ -859,8 +972,8 @@ function AdminApp({
       />
       <Shell
         title={t("adminPanel")}
-        userName={t("admin")}
-        avatar={usersData.admin.avatar || null}
+        userName={currentUser.username}
+        avatar={myAdmin.avatar || null}
         onLogout={onLogout}
         onTitleClick={() => setDrawerOpen(true)}
         bottomNav={bottomNav}
@@ -904,10 +1017,10 @@ function AdminApp({
           )}
 
           <div className="space-y-2">
-            {usersData.employees.length === 0 && (
+            {myEmployees.length === 0 && (
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
             )}
-            {usersData.employees.map((emp) => (
+            {myEmployees.map((emp) => (
               <EmployeeRow key={emp.id} emp={emp} summary={summaryFor(emp.id)} onDelete={() => deleteEmployee(emp.id)} />
             ))}
           </div>
@@ -915,53 +1028,106 @@ function AdminApp({
       )}
 
       {adminTab === "attendance" && (
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
-          <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold mb-4">
-            <Calendar size={15} /> {t("markAttendanceHeader")}
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("employee")}</label>
-              <select value={attEmp} onChange={(e) => setAttEmp(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)]">
-                <option value="">{t("selectPlaceholder")}</option>
-                {usersData.employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
+        <div className="space-y-4">
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
+                <Calendar size={15} /> {t("markAttendanceHeader")}
+              </div>
+              <label className="text-[var(--text-muted)]">
+                <input type="date" value={attDate} onChange={(e) => setAttDate(e.target.value)} className="bg-transparent text-[var(--text-secondary)] text-xs outline-none" />
+              </label>
             </div>
-            <Field label={t("date")} type="date" value={attDate} onChange={setAttDate} />
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setWeekOffset((w) => w - 1)}
+                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] transition-colors"
+                aria-label="prev week"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <div className="flex-1 grid grid-cols-7 gap-1.5">
+                {dateStrip.map((d) => {
+                  const dt = new Date(d + "T00:00:00");
+                  const weekday = dt.toLocaleDateString(localeTag, { weekday: "short" });
+                  const isToday = d === todayISO();
+                  const isSelected = d === attDate;
+                  const style = isToday
+                    ? { backgroundColor: "#5cbf8f", color: "#0e1712", boxShadow: isSelected ? `0 0 0 2px var(--bg-card), 0 0 0 4px ${accent}` : "none" }
+                    : isSelected
+                      ? { backgroundColor: accent, color: "#12161c" }
+                      : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" };
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setAttDate(d)}
+                      className="flex flex-col items-center justify-center py-2 rounded-lg text-xs transition-colors"
+                      style={style}
+                    >
+                      <span className="text-[10px] opacity-80 capitalize">{weekday}</span>
+                      <span className="text-sm font-semibold">{dt.getDate()}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setWeekOffset((w) => w + 1)}
+                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] transition-colors"
+                aria-label="next week"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
-          {attEmp && (
-            <>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <button onClick={() => markAttendance(1)}
-                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[#1d3d2e] text-[#5cbf8f] text-xs font-medium hover:bg-[#234a37] transition-colors">
-                  <CheckCircle2 size={14} /> {t("fullDay")}
-                </button>
-                <button onClick={() => markAttendance(0.5)}
-                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[#3a3320] text-[#d9b23c] text-xs font-medium hover:bg-[#453d26] transition-colors">
-                  <Calendar size={14} /> {t("halfDay")}
-                </button>
-                <button onClick={() => markAttendance(0)}
-                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[#3d221f] text-[#e2685f] text-xs font-medium hover:bg-[#4a2a26] transition-colors">
-                  <XCircle size={14} /> {t("absent")}
-                </button>
-                <button onClick={clearAttendance}
-                  className="flex items-center justify-center py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-muted)] text-xs hover:text-[var(--text-primary)] transition-colors">
-                  {t("clear")}
-                </button>
-              </div>
-              <div className="text-xs text-[var(--text-muted)] mt-3">
-                {attDate} {t("statusPrefix")} {" "}
-                {attendance[attEmp]?.[attDate] === 1 && <span className="text-[#5cbf8f]">{t("statusFull")}</span>}
-                {attendance[attEmp]?.[attDate] === 0.5 && <span className="text-[#d9b23c]">{t("statusHalf")}</span>}
-                {attendance[attEmp]?.[attDate] === 0 && <span className="text-[#e2685f]">{t("statusAbsent")}</span>}
-                {attendance[attEmp]?.[attDate] === undefined && <span>{t("statusNone")}</span>}
-              </div>
-              <div className="mt-4 pt-4 border-t border-[var(--border)] text-sm text-[var(--text-secondary)]">
-                {t("totalWorkedDays")} <b className="text-[var(--text-primary)]">{Number(sEmp.workedDays.toFixed(1))}</b>
-              </div>
-            </>
-          )}
+
+          <div className="space-y-2">
+            {myEmployees.length === 0 && (
+              <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
+            )}
+            {myEmployees.map((emp) => {
+              const st = attendance[emp.id]?.[attDate];
+              return (
+                <div key={emp.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <Avatar src={emp.avatar} name={emp.name} size={32} />
+                    <div className="min-w-0">
+                      <div className="text-[var(--text-primary)] text-sm font-medium truncate">{emp.name}</div>
+                      <div className="text-[var(--text-muted)] text-[11px]">{fmt(emp.dailyWage)}{t("perDay")}</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => markAttendance(emp.id, 1)}
+                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors"
+                      style={st === 1 ? { backgroundColor: "#5cbf8f", color: "#0e1712" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+                    >
+                      <CheckCircle2 size={13} /> {t("fullDay")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => markAttendance(emp.id, 0.5)}
+                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors"
+                      style={st === 0.5 ? { backgroundColor: "#d9b23c", color: "#1a1608" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+                    >
+                      <Calendar size={13} /> {t("halfDay")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => markAttendance(emp.id, 0)}
+                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors"
+                      style={st === 0 ? { backgroundColor: "#e2685f", color: "#1c0e0c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+                    >
+                      <XCircle size={13} /> {t("absent")}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -977,7 +1143,7 @@ function AdminApp({
                 <select value={advEmp} onChange={(e) => setAdvEmp(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)]">
                   <option value="">{t("selectPlaceholder")}</option>
-                  {usersData.employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  {myEmployees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
               </div>
               <Field label={t("amount")} type="number" value={advForm.amount} onChange={(v) => setAdvForm({ ...advForm, amount: v })} />
@@ -1030,7 +1196,7 @@ function AdminApp({
                 </tr>
               </thead>
               <tbody>
-                {usersData.employees.map((emp) => {
+                {myEmployees.map((emp) => {
                   const s = summaryFor(emp.id);
                   return (
                     <tr key={emp.id} className="border-t border-[var(--border-soft)]">
@@ -1042,7 +1208,7 @@ function AdminApp({
                     </tr>
                   );
                 })}
-                {usersData.employees.length === 0 && (
+                {myEmployees.length === 0 && (
                   <tr><td colSpan={5} className="py-8 text-center text-[var(--text-muted)]">{t("noData")}</td></tr>
                 )}
               </tbody>
@@ -1144,7 +1310,6 @@ export default function WorkforceApp() {
   const [adminTab, setAdminTab] = useState("employees");
   const [newEmp, setNewEmp] = useState({ name: "", username: "", password: "", dailyWage: "" });
   const [empError, setEmpError] = useState("");
-  const [attEmp, setAttEmp] = useState("");
   const [attDate, setAttDate] = useState(todayISO());
   const [advEmp, setAdvEmp] = useState("");
   const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "" });
@@ -1183,8 +1348,20 @@ export default function WorkforceApp() {
     } catch (e) {
       usersVal = null;
     }
-    if (!usersVal || !usersVal.admin) {
-      usersVal = { admin: { ...ADMIN_DEFAULT }, employees: [] };
+    if (!usersVal) {
+      usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: [] };
+      await safeSet("users-data", JSON.stringify(usersVal));
+    } else if (usersVal.admin && !usersVal.admins) {
+      // Migrate old single-admin data shape to the new multi-admin shape,
+      // without losing the existing admin's login or employees.
+      const owner = usersVal.admin.username;
+      usersVal = {
+        admins: { [owner]: { password: usersVal.admin.password, avatar: usersVal.admin.avatar || null } },
+        employees: (usersVal.employees || []).map((e) => ({ ...e, owner })),
+      };
+      await safeSet("users-data", JSON.stringify(usersVal));
+    } else if (!usersVal.admins) {
+      usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: usersVal.employees || [] };
       await safeSet("users-data", JSON.stringify(usersVal));
     }
     setUsersData(usersVal);
@@ -1219,27 +1396,48 @@ export default function WorkforceApp() {
     await safeSet("advances-data", JSON.stringify(data));
   }
 
-  function handleLogin() {
+  function handleLogin(asAdmin) {
     setLoginError("");
     try {
       const username = loginForm.username.trim();
       const password = loginForm.password;
-      const admin = (usersData && usersData.admin) ? usersData.admin : ADMIN_DEFAULT;
+      const admins = (usersData && usersData.admins) ? usersData.admins : { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password } };
       const employees = (usersData && usersData.employees) ? usersData.employees : [];
 
-      if (username === admin.username && password === admin.password) {
-        setCurrentUser({ role: "admin", name: "Admin" });
-        return;
-      }
-      const emp = employees.find((x) => x.username === username && x.password === password);
-      if (emp) {
-        setCurrentUser({ role: "employee", id: emp.id, name: emp.name });
-        return;
+      if (asAdmin) {
+        if (admins[username] && admins[username].password === password) {
+          setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username });
+          return;
+        }
+      } else {
+        const emp = employees.find((x) => x.username === username && x.password === password);
+        if (emp) {
+          setCurrentUser({ role: "employee", id: emp.id, name: emp.name, owner: emp.owner });
+          return;
+        }
       }
       setLoginError(makeT(lang)("wrongLogin"));
     } catch (err) {
       setLoginError(String(err && err.message ? err.message : err));
     }
+  }
+
+  // Anyone can create their own manager account — each admin only ever
+  // sees and manages the employees they personally created.
+  function registerAdmin(newUsername, newPassword) {
+    const admins = usersData.admins || {};
+    if (!newUsername || !newUsername.trim()) return { error: makeT(lang)("errEmptyLogin") };
+    const uname = newUsername.trim();
+    if (admins[uname] || usersData.employees.some((e) => e.username === uname)) {
+      return { error: makeT(lang)("errLoginTaken") };
+    }
+    if (!newPassword || newPassword.length < 4) {
+      return { error: makeT(lang)("errShortPassword") };
+    }
+    const updated = { ...usersData, admins: { ...admins, [uname]: { password: newPassword, avatar: null } } };
+    persistUsers(updated);
+    setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username: uname });
+    return {};
   }
 
   function logout() {
@@ -1268,7 +1466,7 @@ export default function WorkforceApp() {
       setEmpError(makeT(lang)("fillAllFields"));
       return;
     }
-    if (usersData.employees.some((x) => x.username === newEmp.username) || newEmp.username === usersData.admin.username) {
+    if (usersData.employees.some((x) => x.username === newEmp.username) || Object.keys(usersData.admins).includes(newEmp.username)) {
       setEmpError(makeT(lang)("errLoginTaken"));
       return;
     }
@@ -1278,6 +1476,7 @@ export default function WorkforceApp() {
       employees: [...usersData.employees, {
         id, name: newEmp.name, username: newEmp.username,
         password: newEmp.password, dailyWage: Number(newEmp.dailyWage), avatar: null,
+        owner: currentUser.username,
       }],
     };
     await persistUsers(updated);
@@ -1285,24 +1484,22 @@ export default function WorkforceApp() {
   }
 
   async function deleteEmployee(id) {
+    const target = usersData.employees.find((x) => x.id === id);
+    if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
     await persistUsers({ ...usersData, employees: usersData.employees.filter((x) => x.id !== id) });
     const att2 = { ...attendance }; delete att2[id]; await persistAttendance(att2);
     const adv2 = { ...advances }; delete adv2[id]; await persistAdvances(adv2);
-    if (attEmp === id) setAttEmp("");
     if (advEmp === id) setAdvEmp("");
   }
 
-  async function markAttendance(status) {
-    if (!attEmp) return;
-    const att = { ...attendance, [attEmp]: { ...(attendance[attEmp] || {}), [attDate]: status } };
-    await persistAttendance(att);
-  }
-
-  async function clearAttendance() {
-    if (!attEmp) return;
-    const dayMap = { ...(attendance[attEmp] || {}) };
-    delete dayMap[attDate];
-    await persistAttendance({ ...attendance, [attEmp]: dayMap });
+  async function markAttendance(empId, status) {
+    const dayMap = { ...(attendance[empId] || {}) };
+    if (dayMap[attDate] === status) {
+      delete dayMap[attDate]; // clicking the active status again clears it
+    } else {
+      dayMap[attDate] = status;
+    }
+    await persistAttendance({ ...attendance, [empId]: dayMap });
   }
 
   async function addAdvance() {
@@ -1322,22 +1519,33 @@ export default function WorkforceApp() {
   function changeOwnCredentials(newUsername, newPassword) {
     if (!currentUser) return { error: "—" };
     if (currentUser.role === "admin") {
-      persistUsers({ ...usersData, admin: { ...usersData.admin, username: newUsername, password: newPassword } });
-      setCurrentUser({ role: "admin", name: "Admin" });
+      const oldUsername = currentUser.username;
+      const taken = newUsername !== oldUsername &&
+        (Object.keys(usersData.admins).includes(newUsername) || usersData.employees.some((e) => e.username === newUsername));
+      if (taken) return { error: makeT(lang)("errLoginTaken") };
+      const admins = { ...usersData.admins };
+      const data = admins[oldUsername];
+      delete admins[oldUsername];
+      admins[newUsername] = { ...data, password: newPassword };
+      // Keep this admin's employees pointing at them under their new username.
+      const employees = usersData.employees.map((e) => (e.owner === oldUsername ? { ...e, owner: newUsername } : e));
+      persistUsers({ ...usersData, admins, employees });
+      setCurrentUser({ role: "admin", name: currentUser.name, username: newUsername });
       return {};
     }
-    const taken = usersData.employees.some((e) => e.id !== currentUser.id && e.username === newUsername) || newUsername === usersData.admin.username;
+    const taken = usersData.employees.some((e) => e.id !== currentUser.id && e.username === newUsername) || Object.keys(usersData.admins).includes(newUsername);
     if (taken) return { error: makeT(lang)("errLoginTaken") };
     const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, username: newUsername, password: newPassword } : e));
     persistUsers({ ...usersData, employees });
-    setCurrentUser({ role: "employee", id: currentUser.id, name: currentUser.name });
+    setCurrentUser({ role: "employee", id: currentUser.id, name: currentUser.name, owner: currentUser.owner });
     return {};
   }
 
   async function updateAvatar(dataUrl) {
     if (!currentUser) return;
     if (currentUser.role === "admin") {
-      await persistUsers({ ...usersData, admin: { ...usersData.admin, avatar: dataUrl } });
+      const admins = { ...usersData.admins, [currentUser.username]: { ...usersData.admins[currentUser.username], avatar: dataUrl } };
+      await persistUsers({ ...usersData, admins });
     } else {
       const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, avatar: dataUrl } : e));
       await persistUsers({ ...usersData, employees });
@@ -1356,6 +1564,7 @@ export default function WorkforceApp() {
         setLoginForm={setLoginForm}
         loginError={loginError}
         onSubmit={handleLogin}
+        onRegister={registerAdmin}
       />
     );
   } else if (currentUser.role === "admin") {
@@ -1373,12 +1582,9 @@ export default function WorkforceApp() {
         addEmployee={addEmployee}
         deleteEmployee={deleteEmployee}
         attendance={attendance}
-        attEmp={attEmp}
-        setAttEmp={setAttEmp}
         attDate={attDate}
         setAttDate={setAttDate}
         markAttendance={markAttendance}
-        clearAttendance={clearAttendance}
         advances={advances}
         advEmp={advEmp}
         setAdvEmp={setAdvEmp}
