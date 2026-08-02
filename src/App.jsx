@@ -1366,6 +1366,34 @@ export default function WorkforceApp() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Live sync: whenever ANY device saves users/attendance/advances data,
+  // every other open screen picks up the change automatically — no manual
+  // refresh needed. Falls back gracefully (just does nothing) if realtime
+  // isn't enabled on the Supabase table.
+  useEffect(() => {
+    const channel = supabase
+      .channel("app_storage_live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_storage" },
+        (payload) => {
+          const row = payload.new;
+          if (!row || typeof row.value === "undefined") return;
+          try {
+            if (row.key === "users-data") setUsersData(JSON.parse(row.value));
+            else if (row.key === "attendance-data") setAttendance(JSON.parse(row.value));
+            else if (row.key === "advances-data") setAdvances(JSON.parse(row.value));
+          } catch (e) {
+            // ignore malformed payloads
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Apply the chosen font size by scaling the real root font-size, so every
   // rem-based Tailwind text class scales correctly — unlike CSS `zoom`,
   // this never breaks `position: fixed` elements like the bottom nav.
