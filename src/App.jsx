@@ -93,6 +93,7 @@ const STR = {
   myAdvances: { uz: "Avanslarim", ru: "Мои авансы", en: "My advances" },
   noAdvancesYet: { uz: "Hali avans olmagansiz", ru: "Вы ещё не получали аванс", en: "You haven't taken an advance yet" },
   statWorkedDays: { uz: "Ishlagan kunlar", ru: "Отработано дней", en: "Days worked" },
+  statDailyWage: { uz: "Kunlik stavka", ru: "Дневная ставка", en: "Daily rate" },
   statTakenAdvance: { uz: "Olingan avans", ru: "Взятый аванс", en: "Advance taken" },
   statRemainingSalary: { uz: "Qolgan maosh", ru: "Остаток зарплаты", en: "Remaining salary" },
   profile: { uz: "Profil", ru: "Профиль", en: "Profile" },
@@ -103,6 +104,8 @@ const STR = {
   newPassword: { uz: "Yangi parol", ru: "Новый пароль", en: "New password" },
   repeatNewPassword: { uz: "Yangi parolni takrorlang", ru: "Повторите новый пароль", en: "Repeat new password" },
   save: { uz: "Saqlash", ru: "Сохранить", en: "Save" },
+  editWage: { uz: "Ish haqini o'zgartirish", ru: "Изменить зарплату", en: "Edit wage" },
+  newDailyWage: { uz: "Yangi kunlik ish haqi (so'm)", ru: "Новая дневная зарплата (сум)", en: "New daily wage" },
   language: { uz: "Til", ru: "Язык", en: "Language" },
   themeColor: { uz: "Mavzu rangi", ru: "Цвет темы", en: "Theme color" },
   lightBg: { uz: "Oq fon", ru: "Светлый фон", en: "Light background" },
@@ -552,12 +555,20 @@ function Lightbox({ src, name, onClose }) {
   );
 }
 
-function EmployeeRow({ emp, summary: s, onDelete }) {
+function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
   const [open, setOpen] = useState(false);
   const [reveal, setReveal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
+  const [editingWage, setEditingWage] = useState(false);
+  const [wageDraft, setWageDraft] = useState(String(emp.dailyWage || ""));
   const { accent, t } = useApp();
+
+  function saveWage() {
+    const n = Number(wageDraft);
+    if (wageDraft && n >= 0) onUpdateWage(n);
+    setEditingWage(false);
+  }
 
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden">
@@ -626,6 +637,35 @@ function EmployeeRow({ emp, summary: s, onDelete }) {
               <CopyButton text={emp.password} />
             </div>
           </div>
+
+          <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1 mt-1">
+            <Wallet size={12} /> {t("dailyWage")}
+          </div>
+          {!editingWage ? (
+            <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg px-3 py-2">
+              <div className="text-[var(--text-primary)] text-sm">{fmt(emp.dailyWage)}{t("perDay")}</div>
+              <button
+                type="button"
+                onClick={() => { setWageDraft(String(emp.dailyWage || "")); setEditingWage(true); }}
+                className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                aria-label={t("editWage")}
+              >
+                <Settings size={14} />
+              </button>
+            </div>
+          ) : (
+            <div className="bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg p-3 space-y-2">
+              <MoneyField label={t("newDailyWage")} value={wageDraft} onChange={setWageDraft} suffix="so'm" />
+              <div className="flex gap-2">
+                <button type="button" onClick={saveWage} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
+                  {t("save")}
+                </button>
+                <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg bg-transparent border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                  {t("cancel")}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-2 pt-1">
             <div className="text-center">
@@ -938,7 +978,7 @@ function ProfileDrawer({
 function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
-  newEmp, setNewEmp, empError, addEmployee, deleteEmployee,
+  newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
@@ -1053,7 +1093,7 @@ function AdminApp({
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
             )}
             {myEmployees.map((emp) => (
-              <EmployeeRow key={emp.id} emp={emp} summary={summaryFor(emp.id)} onDelete={() => deleteEmployee(emp.id)} />
+              <EmployeeRow key={emp.id} emp={emp} summary={summaryFor(emp.id)} onDelete={() => deleteEmployee(emp.id)} onUpdateWage={(w) => updateEmployeeWage(emp.id, w)} />
             ))}
           </div>
         </div>
@@ -1330,8 +1370,9 @@ function EmployeeApp({
         onLogout={onLogout}
         onTitleClick={() => setDrawerOpen(true)}
       >
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-2">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
           <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
+          <Stat label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} />
           <Stat label={t("statRemainingSalary")} value={fmt(s.remaining)} tone="good" icon={<Wallet size={12} />} />
         </div>
         <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-6">
@@ -1647,6 +1688,13 @@ export default function WorkforceApp() {
     if (advEmp === id) setAdvEmp("");
   }
 
+  async function updateEmployeeWage(id, newWage) {
+    const target = usersData.employees.find((x) => x.id === id);
+    if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
+    const employees = usersData.employees.map((e) => (e.id === id ? { ...e, dailyWage: newWage } : e));
+    await persistUsers({ ...usersData, employees });
+  }
+
   async function markAttendance(empId, status) {
     if (attDate > todayISO()) return; // safety guard — future dates can't be marked
     const dayMap = { ...(attendance[empId] || {}) };
@@ -1737,6 +1785,7 @@ export default function WorkforceApp() {
         empError={empError}
         addEmployee={addEmployee}
         deleteEmployee={deleteEmployee}
+        updateEmployeeWage={updateEmployeeWage}
         attendance={attendance}
         attDate={attDate}
         setAttDate={setAttDate}
