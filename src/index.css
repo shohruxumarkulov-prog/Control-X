@@ -6,7 +6,15 @@ html, body, #root {
   height: 100%;
 }
 
+html {
+  /* Stops the browser's native pull-to-refresh gesture from triggering a
+     full page reload (which was wiping the logged-in session). The app
+     still works fine — this only removes that specific overscroll effect. */
+  overscroll-behavior-y: contain;
+}
+
 body {
   margin: 0;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
 }
