@@ -349,6 +349,16 @@ function Avatar({ src, name, size = 40 }) {
     </div>
   );
 }
+function Logo({ size = 32 }) {
+  return (
+    <img
+      src="/logo.svg"
+      alt="Nazorat+"
+      style={{ width: size, height: size }}
+      className="rounded-lg object-cover shrink-0"
+    />
+  );
+}
 
 function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
   const { accent } = useApp();
@@ -364,9 +374,7 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
           {avatar !== undefined ? (
             <Avatar src={avatar} name={userName} size={32} />
           ) : (
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: accent }}>
-              <ShieldCheck size={16} className="text-[#12161c]" />
-            </div>
+           <Logo size={32} />
           )}
           <div>
             <div className="text-[var(--text-primary)] font-semibold text-sm leading-tight tracking-tight">{title}</div>
@@ -406,9 +414,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
       <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-2 justify-center mb-8">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
-              <ShieldCheck size={18} className="text-[#12161c]" />
-            </div>
+            <Logo size={36} />
             <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
           </div>
           <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7 shadow-lg">
@@ -440,9 +446,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 justify-center mb-8">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
-            <ShieldCheck size={18} className="text-[#12161c]" />
-          </div>
+          <Logo size={36} />
           <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
         </div>
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7 shadow-lg">
