@@ -4,8 +4,8 @@
   "description": "Nazorat+.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#262659",
-  "theme_color": "#262659",
+ "background_color": "#12101c",
+  "theme_color": "#12101c"
   "orientation": "portrait",
   "icons": [
     {
