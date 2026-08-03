@@ -17,4 +17,5 @@ body {
   margin: 0;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: contain;
+  background-color: #101317; /* matches dark theme's --bg-app, avoids a white flash before JS mounts */
 }
