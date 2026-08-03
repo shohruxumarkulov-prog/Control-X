@@ -52,7 +52,7 @@ const LANGS = [
 ];
 
 const STR = {
-  appName: { uz: "Ish Nazorati", ru: "Контроль работы", en: "Work Control" },
+  appName: { uz: "Nazorat+", ru: "Nazorat+", en: "Nazorat+" },
   loginTitle: { uz: "Tizimga kirish", ru: "Вход в систему", en: "Sign in" },
   loginSubtitle: { uz: "Login va parolingizni kiriting", ru: "Введите логин и пароль", en: "Enter your login and password" },
   login: { uz: "Login", ru: "Логин", en: "Username" },
