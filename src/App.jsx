@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
@@ -169,6 +169,9 @@ const STR = {
   confirmDeleteAccountAdmin: { uz: "Rostdan ham akkauntingizni o'chirmoqchimisiz? Barcha ishchilaringiz, davomat va avans tarixi ham butunlay o'chib ketadi.", ru: "Точно удалить аккаунт? Все ваши сотрудники, посещаемость и авансы тоже будут удалены навсегда.", en: "Really delete your account? All your employees, attendance, and advance history will be permanently deleted too." },
   confirmDeleteAccountEmployee: { uz: "Rostdan ham akkauntingizni o'chirmoqchimisiz? Davomat va avans tarixingiz ham butunlay o'chib ketadi.", ru: "Точно удалить аккаунт? Ваша посещаемость и авансы тоже будут удалены навсегда.", en: "Really delete your account? Your attendance and advance history will be permanently deleted too." },
   yesDeleteAccount: { uz: "Ha, akkauntni o'chirish", ru: "Да, удалить аккаунт", en: "Yes, delete account" },
+  appearance: { uz: "Ko'rinish", ru: "Внешний вид", en: "Appearance" },
+  privacySecurity: { uz: "Maxfiylik va xavfsizlik", ru: "Конфиденциальность и безопасность", en: "Privacy and Security" },
+  advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
 };
 
 function makeT(lang) {
@@ -744,24 +747,16 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
 }
 
 // ---------- PROFILE DRAWER (role-aware: admin or employee) ----------
-function AccordionRow({ icon, label, valueHint, isOpen, onToggle, children }) {
+function MenuRow({ icon, label, onClick }) {
   return (
-    <div className="border-b border-[var(--border)] last:border-b-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between py-3.5 text-left"
-      >
-        <span className="flex items-center gap-3 text-[var(--text-primary)] text-sm">
-          {icon} {label}
-        </span>
-        <span className="flex items-center gap-1.5 text-[var(--text-muted)] text-xs">
-          {valueHint}
-          <ChevronDown size={15} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
-        </span>
-      </button>
-      {isOpen && <div className="pb-4">{children}</div>}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center justify-between py-3.5 border-b border-[var(--border)] last:border-b-0 text-left"
+    >
+      <span className="flex items-center gap-3 text-[var(--text-primary)] text-sm">{icon}{label}</span>
+      <ChevronRight size={16} className="text-[var(--text-muted)]" />
+    </button>
   );
 }
 
@@ -772,7 +767,7 @@ function ProfileDrawer({
 }) {
   const { t } = useApp();
   const fileRef = useRef(null);
-  const [section, setSection] = useState(null); // which accordion row is open
+  const [page, setPage] = useState(null); // null | "appearance" | "privacy" | "language" | "advanced"
   const [currentPw, setCurrentPw] = useState("");
   const [newUsername, setNewUsername] = useState(me.username);
   const [newPw, setNewPw] = useState("");
@@ -781,9 +776,7 @@ function ProfileDrawer({
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [confirmDeleteAcc, setConfirmDeleteAcc] = useState(false);
 
-  function toggle(id) {
-    setSection((cur) => (cur === id ? null : id));
-  }
+  const PAGE_TITLES = { appearance: t("appearance"), privacy: t("privacySecurity"), language: t("language"), advanced: t("advanced") };
 
   async function handleFile(e) {
     const file = e.target.files && e.target.files[0];
@@ -826,7 +819,6 @@ function ProfileDrawer({
     setMsg({ type: "ok", text: t("savedOk") });
   }
 
-  const currentLangLabel = LANGS.find((l) => l.code === lang)?.label || "";
   const currentFontLabel = t(FONT_SCALES.find((f) => f.value === fontScale)?.key || "fontMedium");
 
   return (
@@ -841,7 +833,16 @@ function ProfileDrawer({
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-end px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--bg-panel)] z-10">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--bg-panel)] z-10">
+          {page ? (
+            <button
+              type="button"
+              onClick={() => setPage(null)}
+              className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold"
+            >
+              <ArrowLeft size={18} /> {PAGE_TITLES[page]}
+            </button>
+          ) : <span />}
           <button
             type="button"
             onClick={() => setMode(mode === "dark" ? "light" : "dark")}
@@ -852,116 +853,113 @@ function ProfileDrawer({
           </button>
         </div>
 
-        <div className="px-5 pt-5">
-          {/* Profile identity + avatar — side by side */}
-          <div className="flex items-center gap-3.5 pb-5">
-            <div className="relative shrink-0">
-              <Avatar src={me.avatar} name={me.name} size={56} />
-              <button
-                type="button"
-                onClick={() => fileRef.current && fileRef.current.click()}
-                disabled={avatarBusy}
-                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center border-2"
-                style={{ backgroundColor: accent, color: "#12161c", borderColor: "var(--bg-panel)" }}
-                aria-label={t("changePhoto")}
-              >
-                <Camera size={11} />
-              </button>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+        {!page && (
+          <>
+            <div className="px-5 pt-5">
+              {/* Profile identity + avatar — side by side */}
+              <div className="flex items-center gap-3.5 pb-5">
+                <div className="relative shrink-0">
+                  <Avatar src={me.avatar} name={me.name} size={56} />
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current && fileRef.current.click()}
+                    disabled={avatarBusy}
+                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center border-2"
+                    style={{ backgroundColor: accent, color: "#12161c", borderColor: "var(--bg-panel)" }}
+                    aria-label={t("changePhoto")}
+                  >
+                    <Camera size={11} />
+                  </button>
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[var(--text-primary)] text-base font-semibold truncate">{me.name}</div>
+                  <div className="text-[var(--text-muted)] text-sm truncate">{roleLabel}</div>
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <div className="text-[var(--text-primary)] text-base font-semibold truncate">{me.name}</div>
-              <div className="text-[var(--text-muted)] text-sm truncate">{roleLabel}</div>
+
+            {/* Settings menu — each row opens its own sub-page */}
+            <div className="px-5">
+              <MenuRow icon={<Paintbrush size={18} className="text-[var(--accent)]" />} label={t("appearance")} onClick={() => setPage("appearance")} />
+              <MenuRow icon={<ShieldCheck size={18} className="text-[var(--good)]" />} label={t("privacySecurity")} onClick={() => setPage("privacy")} />
+              <MenuRow icon={<Globe size={18} className="text-[var(--accent)]" />} label={t("language")} onClick={() => setPage("language")} />
+              <MenuRow icon={<Settings size={18} className="text-[var(--text-secondary)]" />} label={t("advanced")} onClick={() => setPage("advanced")} />
+            </div>
+            <div className="h-5" />
+          </>
+        )}
+
+        {page === "appearance" && (
+          <div className="px-5 pt-5 pb-8 space-y-6">
+            <div>
+              <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-2.5">
+                <Palette size={13} /> {t("themeColor")}
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                {ACCENT_PRESETS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setAccent(p.value)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-90"
+                    style={{ backgroundColor: p.value, boxShadow: accent === p.value ? `0 0 0 2px var(--bg-panel), 0 0 0 4px ${p.value}` : "none" }}
+                    aria-label={p.name}
+                  >
+                    {accent === p.value && <Check size={14} className="text-[#12161c]" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-2.5">
+                <Type size={13} /> {t("fontSize")}
+              </div>
+              <div className="flex gap-2">
+                {FONT_SCALES.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => setFontScale(f.value)}
+                    className="flex-1 py-2.5 rounded-lg text-xs font-medium transition-colors"
+                    style={
+                      fontScale === f.value
+                        ? { backgroundColor: accent, color: "#12161c" }
+                        : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }
+                    }
+                  >
+                    {t(f.key)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Telegram-style accordion rows */}
-        <div className="px-5">
-          <AccordionRow
-            icon={<Palette size={16} className="text-[var(--text-muted)]" />}
-            label={t("themeColor")}
-            valueHint={<span className="w-3.5 h-3.5 rounded-full inline-block" style={{ backgroundColor: accent }} />}
-            isOpen={section === "theme"}
-            onToggle={() => toggle("theme")}
-          >
-            <div className="flex gap-2.5 mb-4">
-              <button
-                type="button"
-                onClick={() => setMode("light")}
-                className="flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-lg border transition-colors"
-                style={{
-                  backgroundColor: "#ffffff",
-                  borderColor: mode === "light" ? accent : "var(--border-input)",
-                  borderWidth: mode === "light" ? 2 : 1,
-                }}
-              >
-                <Sun size={16} color="#1c2128" />
-                <span className="text-[11px]" style={{ color: "#1c2128" }}>{t("lightBg")}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("dark")}
-                className="flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-lg border transition-colors"
-                style={{
-                  backgroundColor: "#12161c",
-                  borderColor: mode === "dark" ? accent : "#2a323d",
-                  borderWidth: mode === "dark" ? 2 : 1,
-                }}
-              >
-                <Moon size={16} color="#e8ebef" />
-                <span className="text-[11px]" style={{ color: "#e8ebef" }}>{t("darkBg")}</span>
-              </button>
+        {page === "privacy" && (
+          <div className="px-5 pt-5 pb-8">
+            <div className="space-y-3">
+              <Field label={t("currentPassword")} type="password" value={currentPw} onChange={setCurrentPw} />
+              <Field label={t("newLogin")} value={newUsername} onChange={setNewUsername} />
+              <Field label={t("newPassword")} type="password" value={newPw} onChange={setNewPw} />
+              <Field label={t("repeatNewPassword")} type="password" value={newPw2} onChange={setNewPw2} />
             </div>
-            <div className="flex flex-wrap gap-2.5">
-              {ACCENT_PRESETS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setAccent(p.value)}
-                  className="w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-90"
-                  style={{ backgroundColor: p.value, boxShadow: accent === p.value ? `0 0 0 2px var(--bg-panel), 0 0 0 4px ${p.value}` : "none" }}
-                  aria-label={p.name}
-                >
-                  {accent === p.value && <Check size={14} className="text-[#12161c]" />}
-                </button>
-              ))}
-            </div>
-          </AccordionRow>
+            {msg.text && (
+              <p className={`text-xs mt-2.5 ${msg.type === "error" ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>{msg.text}</p>
+            )}
+            <button
+              type="button"
+              onClick={submitPassword}
+              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: accent }}
+            >
+              {t("save")}
+            </button>
+          </div>
+        )}
 
-          <AccordionRow
-            icon={<Type size={16} className="text-[var(--text-muted)]" />}
-            label={t("fontSize")}
-            valueHint={currentFontLabel}
-            isOpen={section === "font"}
-            onToggle={() => toggle("font")}
-          >
-            <div className="flex gap-2">
-              {FONT_SCALES.map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  onClick={() => setFontScale(f.value)}
-                  className="flex-1 py-2.5 rounded-lg text-xs font-medium transition-colors"
-                  style={
-                    fontScale === f.value
-                      ? { backgroundColor: accent, color: "#12161c" }
-                      : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }
-                  }
-                >
-                  {t(f.key)}
-                </button>
-              ))}
-            </div>
-          </AccordionRow>
-
-          <AccordionRow
-            icon={<Globe size={16} className="text-[var(--text-muted)]" />}
-            label={t("language")}
-            valueHint={currentLangLabel}
-            isOpen={section === "lang"}
-            onToggle={() => toggle("lang")}
-          >
+        {page === "language" && (
+          <div className="px-5 pt-5 pb-8">
             <div className="flex flex-col gap-2">
               {LANGS.map((l) => (
                 <button
@@ -980,67 +978,44 @@ function ProfileDrawer({
                 </button>
               ))}
             </div>
-          </AccordionRow>
+          </div>
+        )}
 
-          <AccordionRow
-            icon={<Lock size={16} className="text-[var(--text-muted)]" />}
-            label={t("security")}
-            isOpen={section === "security"}
-            onToggle={() => toggle("security")}
-          >
-            <div className="space-y-3">
-              <Field label={t("currentPassword")} type="password" value={currentPw} onChange={setCurrentPw} />
-              <Field label={t("newLogin")} value={newUsername} onChange={setNewUsername} />
-              <Field label={t("newPassword")} type="password" value={newPw} onChange={setNewPw} />
-              <Field label={t("repeatNewPassword")} type="password" value={newPw2} onChange={setNewPw2} />
-            </div>
-            {msg.text && (
-              <p className={`text-xs mt-2.5 ${msg.type === "error" ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>{msg.text}</p>
-            )}
-            <button
-              type="button"
-              onClick={submitPassword}
-              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: accent }}
-            >
-              {t("save")}
-            </button>
-          </AccordionRow>
-        </div>
-
-        <div className="px-5 pt-2 pb-6">
-          {!confirmDeleteAcc ? (
-            <button
-              type="button"
-              onClick={() => setConfirmDeleteAcc(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[var(--bad-soft)] text-[var(--bad)] text-xs font-medium hover:opacity-90 transition-opacity"
-            >
-              <UserX size={14} /> {t("deleteAccount")}
-            </button>
-          ) : (
-            <div className="bg-[var(--bad-soft)] border border-[var(--bad)]/30 rounded-lg p-3.5">
-              <p className="text-[var(--bad)] text-xs mb-2.5">
-                {isAdmin ? t("confirmDeleteAccountAdmin") : t("confirmDeleteAccountEmployee")}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={onDeleteAccount}
-                  className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
-                >
-                  {t("yesDeleteAccount")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteAcc(false)}
-                  className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
-                >
-                  {t("cancel")}
-                </button>
+        {page === "advanced" && (
+          <div className="px-5 pt-5 pb-8">
+            {!confirmDeleteAcc ? (
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteAcc(true)}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[var(--bad-soft)] text-[var(--bad)] text-xs font-medium hover:opacity-90 transition-opacity"
+              >
+                <UserX size={14} /> {t("deleteAccount")}
+              </button>
+            ) : (
+              <div className="bg-[var(--bad-soft)] border border-[var(--bad)]/30 rounded-lg p-3.5">
+                <p className="text-[var(--bad)] text-xs mb-2.5">
+                  {isAdmin ? t("confirmDeleteAccountAdmin") : t("confirmDeleteAccountEmployee")}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={onDeleteAccount}
+                    className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    {t("yesDeleteAccount")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteAcc(false)}
+                    className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    {t("cancel")}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
