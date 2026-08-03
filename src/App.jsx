@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush
+  Menu, ChevronUp, Phone, AlertTriangle
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
@@ -15,6 +15,10 @@ const fmtDays = (n) => {
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 };
 
+// Finds the daily wage that was in effect on a given date, using the
+// employee's wage history (each entry marks the date a new rate started).
+// Falls back to the employee's current dailyWage if there's no history yet
+// (older data created before this feature existed).
 function wageForDate(emp, date) {
   const history = emp.wageHistory;
   if (!Array.isArray(history) || history.length === 0) return Number(emp.dailyWage || 0);
@@ -26,6 +30,9 @@ function wageForDate(emp, date) {
   return Number(applicable.wage);
 }
 
+// An attendance entry can be a plain number/boolean (older data, before
+// per-entry wage snapshots existed) or an object { v, wage } (current
+// format). These two helpers read either shape safely.
 function attEntryStatus(raw) {
   if (raw && typeof raw === "object") return raw.v;
   if (typeof raw === "number") return raw;
@@ -34,9 +41,10 @@ function attEntryStatus(raw) {
 }
 function attEntryWage(raw, emp, date) {
   if (raw && typeof raw === "object" && typeof raw.wage === "number") return raw.wage;
-  return wageForDate(emp, date);
+  return wageForDate(emp, date); // legacy fallback — best guess from wage history
 }
 
+// ---------- i18n ----------
 const LANGS = [
   { code: "uz", label: "O'zbekcha" },
   { code: "ru", label: "Русский" },
@@ -44,7 +52,7 @@ const LANGS = [
 ];
 
 const STR = {
-  appName: { uz: "Nazorat+", ru: "Nazorat+", en: "Nazorat+" },
+  appName: { uz: "Ish Nazorati", ru: "Контроль работы", en: "Work Control" },
   loginTitle: { uz: "Tizimga kirish", ru: "Вход в систему", en: "Sign in" },
   loginSubtitle: { uz: "Login va parolingizni kiriting", ru: "Введите логин и пароль", en: "Enter your login and password" },
   login: { uz: "Login", ru: "Логин", en: "Username" },
@@ -157,13 +165,6 @@ const STR = {
   createAccountBtn: { uz: "Boshqaruvchi bo'lib ro'yxatdan o'tish", ru: "Зарегистрироваться руководителем", en: "Register as manager" },
   alreadyHaveAccount: { uz: "Mavjud hisobga kirish", ru: "Войти в существующий аккаунт", en: "Sign in to an existing account" },
   newHere: { uz: "Birinchi marta kiryapsizmi?", ru: "Впервые здесь?", en: "First time here?" },
-  deleteAccount: { uz: "Akkauntni o'chirish", ru: "Удалить аккаунт", en: "Delete account" },
-  confirmDeleteAccountAdmin: { uz: "Rostdan ham akkauntingizni o'chirmoqchimisiz? Barcha ishchilaringiz, davomat va avans tarixi ham butunlay o'chib ketadi.", ru: "Точно удалить аккаунт? Все ваши сотрудники, посещаемость и авансы тоже будут удалены навсегда.", en: "Really delete your account? All your employees, attendance, and advance history will be permanently deleted too." },
-  confirmDeleteAccountEmployee: { uz: "Rostdan ham akkauntingizni o'chirmoqchimisiz? Davomat va avans tarixingiz ham butunlay o'chib ketadi.", ru: "Точно удалить аккаунт? Ваша посещаемость и авансы тоже будут удалены навсегда.", en: "Really delete your account? Your attendance and advance history will be permanently deleted too." },
-  yesDeleteAccount: { uz: "Ha, akkauntni o'chirish", ru: "Да, удалить аккаунт", en: "Yes, delete account" },
-  appearance: { uz: "Ko'rinish", ru: "Внешний вид", en: "Appearance" },
-  privacySecurity: { uz: "Maxfiylik va xavfsizlik", ru: "Конфиденциальность и безопасность", en: "Privacy and Security" },
-  advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
 };
 
 function makeT(lang) {
@@ -174,16 +175,17 @@ function makeT(lang) {
   };
 }
 
-const AppContext = createContext({ accent: "#c98a4b", lang: "uz", t: makeT("uz") });
+// ---------- App-wide context (theme + language) ----------
+const AppContext = createContext({ accent: "#d99a3c", lang: "uz", t: makeT("uz") });
 const useApp = () => useContext(AppContext);
 
 const ACCENT_PRESETS = [
-  { name: "Bronza", value: "#c98a4b" },
-  { name: "Feruza", value: "#3a9188" },
-  { name: "Ko'k", value: "#4d84d9" },
-  { name: "Binafsha", value: "#8f7bd6" },
-  { name: "Lolaqizg'aldoq", value: "#d9635a" },
-  { name: "Pushti", value: "#cf6f98" },
+  { name: "Oltin", value: "#d99a3c" },
+  { name: "Ko'k", value: "#4d8fd9" },
+  { name: "Yashil", value: "#4fae7a" },
+  { name: "Binafsha", value: "#9b7fd9" },
+  { name: "Qizil", value: "#e2685f" },
+  { name: "Pushti", value: "#d9709a" },
 ];
 
 const FONT_SCALES = [
@@ -194,33 +196,39 @@ const FONT_SCALES = [
 
 const PALETTES = {
   dark: {
-    "--bg-app": "#101317",
-    "--bg-card": "#181c22",
-    "--bg-panel": "#13161b",
-    "--border": "#242a32",
-    "--border-input": "#2a313a",
-    "--border-soft": "#1c2129",
-    "--text-primary": "#edeff2",
-    "--text-secondary": "#8d97a3",
-    "--text-muted": "#69727e",
-    "--text-faint": "#4a525e",
+    "--bg-app": "#12161c",
+    "--bg-card": "#181d25",
+    "--bg-panel": "#141920",
+    "--border": "#262d38",
+    "--border-input": "#2a323d",
+    "--border-soft": "#1e242c",
+    "--text-primary": "#e8ebef",
+    "--text-secondary": "#8b96a5",
+    "--text-muted": "#6b7684",
+    "--text-faint": "#4d5665",
   },
   light: {
-    "--bg-app": "#eef0f3",
+    "--bg-app": "#f2f3f5",
     "--bg-card": "#ffffff",
     "--bg-panel": "#ffffff",
-    "--border": "#e0e3e8",
-    "--border-input": "#d2d7de",
-    "--border-soft": "#e9ecf0",
-    "--text-primary": "#181c22",
-    "--text-secondary": "#565f6b",
-    "--text-muted": "#7c8592",
-    "--text-faint": "#9aa2ac",
+    "--border": "#e3e6ea",
+    "--border-input": "#d5d9df",
+    "--border-soft": "#ebedf0",
+    "--text-primary": "#1c2128",
+    "--text-secondary": "#5b6472",
+    "--text-muted": "#828a95",
+    "--text-faint": "#9aa1ab",
   },
 };
 
+// Default admin — used both as the initial seed and as an absolute
+// fallback so login always works even if the storage layer never
+// loads for any reason.
 const ADMIN_DEFAULT = { username: "admin", password: "admin123" };
 
+// In-memory fallback store. If Supabase is unreachable (offline, network
+// error), everything still works for the current session — it just
+// won't survive a page refresh until the connection comes back.
 const memoryStore = {};
 
 async function safeGet(key) {
@@ -235,6 +243,7 @@ async function safeGet(key) {
       return data.value;
     }
   } catch (e) {
+    // fall through to memory
   }
   return memoryStore[key];
 }
@@ -244,9 +253,12 @@ async function safeSet(key, value) {
   try {
     await supabase.from("app_storage").upsert({ key, value, updated_at: new Date().toISOString() });
   } catch (e) {
+    // already saved in memory, ignore
   }
 }
 
+// Resize/crop an image file to a small square JPEG data URL so it stays
+// well under storage size limits.
 function fileToAvatarDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -271,6 +283,7 @@ function fileToAvatarDataUrl(file) {
   });
 }
 
+// ---------- SMALL REUSABLE PIECES ----------
 function Field({ label, value, onChange, type = "text" }) {
   const [reveal, setReveal] = useState(false);
   const isPassword = type === "password";
@@ -298,6 +311,11 @@ function Field({ label, value, onChange, type = "text" }) {
   );
 }
 
+// A number input that groups digits by thousands as you type (1 000 000),
+// so entering large sums of money doesn't require carefully counting zeros.
+// `value`/`onChange` still carry the plain digit string (e.g. "1000000") —
+// only the on-screen display is formatted, so all the existing amount math
+// elsewhere in the app keeps working unchanged.
 function MoneyField({ label, value, onChange, suffix }) {
   const digits = String(value || "").replace(/\D/g, "");
   const display = digits ? Number(digits).toLocaleString("uz-UZ") : "";
@@ -311,7 +329,7 @@ function MoneyField({ label, value, onChange, suffix }) {
           value={display}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
           placeholder="0"
-          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm font-mono tabular-nums outline-none focus:border-[var(--accent)] transition-colors`}
+          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors`}
         />
         {suffix && (
           <span className="absolute right-3 top-0 h-full flex items-center text-[var(--text-muted)] text-xs">{suffix}</span>
@@ -324,15 +342,15 @@ function MoneyField({ label, value, onChange, suffix }) {
 function Stat({ label, value, tone = "default", icon }) {
   const toneMap = {
     default: "text-[var(--text-primary)]",
-    good: "text-[var(--good)]",
-    bad: "text-[var(--bad)]",
+    good: "text-[#5cbf8f]",
+    bad: "text-[#e2685f]",
   };
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
       <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-1.5">
         {icon}{label}
       </div>
-      <div className={`text-lg font-semibold font-mono tabular-nums ${toneMap[tone]}`}>{value}</div>
+      <div className={`text-lg font-semibold ${toneMap[tone]}`}>{value}</div>
     </div>
   );
 }
@@ -344,23 +362,13 @@ function Avatar({ src, name, size = 40 }) {
     return <img src={src} alt={name} style={style} className="rounded-full object-cover shrink-0" />;
   }
   return (
-    <div style={style} className="rounded-full bg-[var(--border-input)] text-[var(--text-secondary)] font-semibold flex items-center justify-center shrink-0">
+    <div style={style} className="rounded-full bg-[#2a323d] text-[var(--text-secondary)] font-semibold flex items-center justify-center shrink-0">
       {initials || <UserIcon size={size * 0.5} />}
     </div>
   );
 }
-function Logo({ size = 32 }) {
-  return (
-    <img
-      src="/logo.svg"
-      alt="Nazorat+"
-      style={{ width: size, height: size }}
-      className="rounded-lg object-cover shrink-0"
-    />
-  );
-}
 
-function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
+function Shell({ title, userName, avatar, onLogout, onTitleClick, bottomNav, children }) {
   const { accent } = useApp();
   return (
     <div className="min-h-screen bg-[var(--bg-app)] flex flex-col">
@@ -374,12 +382,17 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
           {avatar !== undefined ? (
             <Avatar src={avatar} name={userName} size={32} />
           ) : (
-           <Logo size={32} />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: accent }}>
+              <ShieldCheck size={16} className="text-[#12161c]" />
+            </div>
           )}
           <div>
-            <div className="text-[var(--text-primary)] font-semibold text-sm leading-tight tracking-tight">{title}</div>
+            <div className="text-[var(--text-primary)] font-semibold text-sm leading-tight">{title}</div>
             <div className="text-[var(--text-muted)] text-xs leading-tight">{userName}</div>
           </div>
+        </button>
+        <button onClick={onLogout} className="flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-[#e2685f] text-xs transition-colors">
+          <LogOut size={14} /> {useApp().t("logout")}
         </button>
       </header>
       <main className={`flex-1 p-5 max-w-4xl w-full mx-auto ${bottomNav ? "pb-28" : ""}`}>{children}</main>
@@ -388,6 +401,7 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
   );
 }
 
+// ---------- LOGIN ----------
 function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister }) {
   const [showPassword, setShowPassword] = useState(false);
   const [asAdmin, setAsAdmin] = useState(false);
@@ -414,18 +428,20 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
       <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-2 justify-center mb-8">
-            <Logo size={36} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
+              <ShieldCheck size={18} className="text-[#12161c]" />
+            </div>
             <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
           </div>
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7 shadow-lg">
-            <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1 tracking-tight">{t("registerTitle")}</h1>
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7">
+            <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1">{t("registerTitle")}</h1>
             <p className="text-[var(--text-muted)] text-sm mb-6">{t("registerSubtitle")}</p>
             <div className="space-y-3.5">
               <Field label={t("chooseLogin")} value={regForm.username} onChange={(v) => setRegForm({ ...regForm, username: v })} />
               <Field label={t("choosePassword")} type="password" value={regForm.password} onChange={(v) => setRegForm({ ...regForm, password: v })} />
               <Field label={t("repeatNewPassword")} type="password" value={regForm.confirm} onChange={(v) => setRegForm({ ...regForm, confirm: v })} />
             </div>
-            {regError && <p className="text-[var(--bad)] text-xs mt-3">{regError}</p>}
+            {regError && <p className="text-[#e2685f] text-xs mt-3">{regError}</p>}
             <button type="button" onClick={submitRegister} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
               {t("createAccountBtn")}
             </button>
@@ -446,11 +462,13 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 justify-center mb-8">
-          <Logo size={36} />
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
+            <ShieldCheck size={18} className="text-[#12161c]" />
+          </div>
           <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
         </div>
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7 shadow-lg">
-          <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1 tracking-tight">
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7">
+          <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1">
             {asAdmin ? t("adminLoginTitle") : t("employeeLoginTitle")}
           </h1>
           <p className="text-[var(--text-muted)] text-sm mb-6">{t("loginSubtitle")}</p>
@@ -479,7 +497,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {loginError && <p className="text-[var(--bad)] text-xs mb-2 mt-1">{loginError}</p>}
+          {loginError && <p className="text-[#e2685f] text-xs mb-2 mt-1">{loginError}</p>}
           <button type="button" onClick={() => onSubmit(asAdmin)} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
             {t("loginBtn")}
           </button>
@@ -516,6 +534,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   );
 }
 
+// ---------- EMPLOYEE ROW (with expandable "..." details panel) ----------
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
   const { t } = useApp();
@@ -525,6 +544,7 @@ function CopyButton({ text }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch (e) {
+      // clipboard unavailable — ignore silently, value is still visible on screen
     }
   }
   return (
@@ -533,7 +553,7 @@ function CopyButton({ text }) {
       onClick={doCopy}
       className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#3a4552] text-[11px] transition-colors shrink-0"
     >
-      {copied ? <Check size={12} className="text-[var(--good)]" /> : <Copy size={12} />}
+      {copied ? <Check size={12} className="text-[#5cbf8f]" /> : <Copy size={12} />}
       {copied ? t("copied") : t("copy")}
     </button>
   );
@@ -581,7 +601,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
   }
 
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden">
       {showPhoto && <Lightbox src={emp.avatar} name={emp.name} onClose={() => setShowPhoto(false)} />}
       <div className="p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -596,7 +616,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <div className={`text-sm font-semibold font-mono tabular-nums ${s.remaining < 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
+          <div className={`text-sm font-semibold ${s.remaining < 0 ? "text-[#e2685f]" : "text-[#5cbf8f]"}`}>
             {fmt(s.remaining)}
           </div>
           <button
@@ -653,7 +673,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
           </div>
           {!editingWage ? (
             <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg px-3 py-2">
-              <div className="text-[var(--text-primary)] text-sm font-mono tabular-nums">{fmt(emp.dailyWage)}{t("perDay")}</div>
+              <div className="text-[var(--text-primary)] text-sm">{fmt(emp.dailyWage)}{t("perDay")}</div>
               <button
                 type="button"
                 onClick={() => { setWageDraft(String(emp.dailyWage || "")); setEditingWage(true); }}
@@ -679,15 +699,15 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
 
           <div className="grid grid-cols-3 gap-2 pt-1">
             <div className="text-center">
-              <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums">{fmtDays(s.workedDays)}</div>
+              <div className="text-[var(--text-primary)] text-sm font-semibold">{fmtDays(s.workedDays)}</div>
               <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">{t("day")}</div>
             </div>
             <div className="text-center">
-              <div className="text-[var(--bad)] text-sm font-semibold font-mono tabular-nums">{fmt(s.totalAdvance)}</div>
+              <div className="text-[#e2685f] text-sm font-semibold">{fmt(s.totalAdvance)}</div>
               <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">{t("advance")}</div>
             </div>
             <div className="text-center">
-              <div className="text-[var(--good)] text-sm font-semibold font-mono tabular-nums">{fmt(s.remaining)}</div>
+              <div className="text-[#5cbf8f] text-sm font-semibold">{fmt(s.remaining)}</div>
               <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">{t("remaining")}</div>
             </div>
           </div>
@@ -696,15 +716,15 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--bad-soft)] text-[var(--bad)] text-xs font-medium hover:opacity-90 transition-opacity mt-1"
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#2a1a18] text-[#e2685f] text-xs font-medium hover:bg-[#33201d] transition-colors mt-1"
             >
               <Trash2 size={13} /> {t("deleteEmployee")}
             </button>
           ) : (
-            <div className="mt-1 bg-[var(--bad-soft)] border border-[var(--bad)]/30 rounded-lg p-3">
-              <p className="text-[var(--bad)] text-xs mb-2.5">{t("confirmDelete", { name: emp.name })}</p>
+            <div className="mt-1 bg-[#2a1a18] border border-[#4a2a26] rounded-lg p-3">
+              <p className="text-[#e2685f] text-xs mb-2.5">{t("confirmDelete", { name: emp.name })}</p>
               <div className="flex gap-2">
-                <button type="button" onClick={onDelete} className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity">
+                <button type="button" onClick={onDelete} className="flex-1 py-2 rounded-lg bg-[#e2685f] text-[#12161c] text-xs font-semibold hover:bg-[#ea7a72] transition-colors">
                   {t("yesDelete")}
                 </button>
                 <button type="button" onClick={() => setConfirmDelete(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
@@ -719,36 +739,46 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
   );
 }
 
-function MenuRow({ icon, label, onClick, danger }) {
+// ---------- PROFILE DRAWER (role-aware: admin or employee) ----------
+function AccordionRow({ icon, label, valueHint, isOpen, onToggle, children }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full flex items-center justify-between py-3.5 border-b border-[var(--border)] last:border-b-0 text-left"
-    >
-      <span className={`flex items-center gap-3 text-sm ${danger ? "text-[var(--bad)]" : "text-[var(--text-primary)]"}`}>{icon}{label}</span>
-      <ChevronRight size={16} className="text-[var(--text-muted)]" />
-    </button>
+    <div className="border-b border-[var(--border)] last:border-b-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between py-3.5 text-left"
+      >
+        <span className="flex items-center gap-3 text-[var(--text-primary)] text-sm">
+          {icon} {label}
+        </span>
+        <span className="flex items-center gap-1.5 text-[var(--text-muted)] text-xs">
+          {valueHint}
+          <ChevronDown size={15} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        </span>
+      </button>
+      {isOpen && <div className="pb-4">{children}</div>}
+    </div>
   );
 }
 
 function ProfileDrawer({
-  open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
+  open, onClose, me, roleLabel,
   changeOwnCredentials, updateAvatar,
   accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const { t } = useApp();
   const fileRef = useRef(null);
-  const [page, setPage] = useState(null);
+  const [section, setSection] = useState(null); // which accordion row is open
   const [currentPw, setCurrentPw] = useState("");
   const [newUsername, setNewUsername] = useState(me.username);
   const [newPw, setNewPw] = useState("");
   const [newPw2, setNewPw2] = useState("");
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [avatarBusy, setAvatarBusy] = useState(false);
-  const [confirmDeleteAcc, setConfirmDeleteAcc] = useState(false);
 
-  const PAGE_TITLES = { appearance: t("appearance"), privacy: t("privacySecurity"), language: t("language"), advanced: t("advanced") };
+  function toggle(id) {
+    setSection((cur) => (cur === id ? null : id));
+  }
 
   async function handleFile(e) {
     const file = e.target.files && e.target.files[0];
@@ -758,6 +788,7 @@ function ProfileDrawer({
       const dataUrl = await fileToAvatarDataUrl(file);
       await updateAvatar(dataUrl);
     } catch (err) {
+      // ignore — avatar upload is best-effort
     }
     setAvatarBusy(false);
     if (fileRef.current) fileRef.current.value = "";
@@ -790,144 +821,138 @@ function ProfileDrawer({
     setMsg({ type: "ok", text: t("savedOk") });
   }
 
+  const currentLangLabel = LANGS.find((l) => l.code === lang)?.label || "";
   const currentFontLabel = t(FONT_SCALES.find((f) => f.value === fontScale)?.key || "fontMedium");
 
   return (
     <>
+      {/* Backdrop: blurs the app content behind it, fully covers the right side */}
       {open && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
       )}
+      {/* Panel: fully opaque, slides in from the left, sits above the blurred backdrop */}
       <div
         className={`fixed top-0 left-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] border-r border-[var(--border)] shadow-2xl z-40 overflow-y-auto transition-transform duration-200 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--bg-panel)] z-10">
-          {page ? (
-            <button
-              type="button"
-              onClick={() => setPage(null)}
-              className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold"
-            >
-              <ArrowLeft size={18} /> {PAGE_TITLES[page]}
-            </button>
-          ) : <span />}
-          <button
-            type="button"
-            onClick={() => setMode(mode === "dark" ? "light" : "dark")}
-            className="text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
-            aria-label={t("themeColor")}
-          >
-            {mode === "dark" ? <Moon size={20} /> : <Sun size={20} />}
+          <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
+            <Settings size={15} /> {t("profile")}
+          </div>
+          <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+            <X size={18} />
           </button>
         </div>
 
-        {!page && (
-          <>
-            <div className="px-5 pt-5">
-              <div className="flex items-center gap-3.5 pb-5">
-                <div className="relative shrink-0">
-                  <Avatar src={me.avatar} name={me.name} size={56} />
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current && fileRef.current.click()}
-                    disabled={avatarBusy}
-                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center border-2"
-                    style={{ backgroundColor: accent, color: "#12161c", borderColor: "var(--bg-panel)" }}
-                    aria-label={t("changePhoto")}
-                  >
-                    <Camera size={11} />
-                  </button>
-                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[var(--text-primary)] text-base font-semibold truncate">{me.name}</div>
-                  <div className="text-[var(--text-muted)] text-sm truncate">{roleLabel}</div>
-                </div>
-              </div>
+        <div className="px-5 pt-5">
+          {/* Profile identity + avatar */}
+          <div className="flex flex-col items-center text-center pb-5">
+            <div className="relative">
+              <Avatar src={me.avatar} name={me.name} size={76} />
+              <button
+                type="button"
+                onClick={() => fileRef.current && fileRef.current.click()}
+                disabled={avatarBusy}
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center border-2"
+                style={{ backgroundColor: accent, color: "#12161c", borderColor: "var(--bg-panel)" }}
+                aria-label={t("changePhoto")}
+              >
+                <Camera size={13} />
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
             </div>
-
-            <div className="px-5">
-              <MenuRow icon={<Paintbrush size={18} className="text-[var(--accent)]" />} label={t("appearance")} onClick={() => setPage("appearance")} />
-              <MenuRow icon={<ShieldCheck size={18} className="text-[var(--good)]" />} label={t("privacySecurity")} onClick={() => setPage("privacy")} />
-              <MenuRow icon={<Globe size={18} className="text-[var(--accent)]" />} label={t("language")} onClick={() => setPage("language")} />
-              <MenuRow icon={<Settings size={18} className="text-[var(--text-secondary)]" />} label={t("advanced")} onClick={() => setPage("advanced")} />
-              <MenuRow icon={<LogOut size={18} className="text-[var(--bad)]" />} label={t("logout")} onClick={onLogout} danger />
-            </div>
-            <div className="h-5" />
-          </>
-        )}
-
-        {page === "appearance" && (
-          <div className="px-5 pt-5 pb-8 space-y-6">
-            <div>
-              <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-2.5">
-                <Palette size={13} /> {t("themeColor")}
-              </div>
-              <div className="flex flex-wrap gap-2.5">
-                {ACCENT_PRESETS.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => setAccent(p.value)}
-                    className="w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-90"
-                    style={{ backgroundColor: p.value, boxShadow: accent === p.value ? `0 0 0 2px var(--bg-panel), 0 0 0 4px ${p.value}` : "none" }}
-                    aria-label={p.name}
-                  >
-                    {accent === p.value && <Check size={14} className="text-[#12161c]" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-2.5">
-                <Type size={13} /> {t("fontSize")}
-              </div>
-              <div className="flex gap-2">
-                {FONT_SCALES.map((f) => (
-                  <button
-                    key={f.value}
-                    type="button"
-                    onClick={() => setFontScale(f.value)}
-                    className="flex-1 py-2.5 rounded-lg text-xs font-medium transition-colors"
-                    style={
-                      fontScale === f.value
-                        ? { backgroundColor: accent, color: "#12161c" }
-                        : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }
-                    }
-                  >
-                    {t(f.key)}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div className="text-[var(--text-primary)] text-sm font-semibold mt-3">{me.name}</div>
+            <div className="text-[var(--text-muted)] text-xs">{roleLabel}</div>
           </div>
-        )}
+        </div>
 
-        {page === "privacy" && (
-          <div className="px-5 pt-5 pb-8">
-            <div className="space-y-3">
-              <Field label={t("currentPassword")} type="password" value={currentPw} onChange={setCurrentPw} />
-              <Field label={t("newLogin")} value={newUsername} onChange={setNewUsername} />
-              <Field label={t("newPassword")} type="password" value={newPw} onChange={setNewPw} />
-              <Field label={t("repeatNewPassword")} type="password" value={newPw2} onChange={setNewPw2} />
+        {/* Telegram-style accordion rows */}
+        <div className="px-5">
+          <AccordionRow
+            icon={<Palette size={16} className="text-[var(--text-muted)]" />}
+            label={t("themeColor")}
+            valueHint={<span className="w-3.5 h-3.5 rounded-full inline-block" style={{ backgroundColor: accent }} />}
+            isOpen={section === "theme"}
+            onToggle={() => toggle("theme")}
+          >
+            <div className="flex gap-2.5 mb-4">
+              <button
+                type="button"
+                onClick={() => setMode("light")}
+                className="flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-lg border transition-colors"
+                style={{
+                  backgroundColor: "#ffffff",
+                  borderColor: mode === "light" ? accent : "var(--border-input)",
+                  borderWidth: mode === "light" ? 2 : 1,
+                }}
+              >
+                <Sun size={16} color="#1c2128" />
+                <span className="text-[11px]" style={{ color: "#1c2128" }}>{t("lightBg")}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("dark")}
+                className="flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-lg border transition-colors"
+                style={{
+                  backgroundColor: "#12161c",
+                  borderColor: mode === "dark" ? accent : "#2a323d",
+                  borderWidth: mode === "dark" ? 2 : 1,
+                }}
+              >
+                <Moon size={16} color="#e8ebef" />
+                <span className="text-[11px]" style={{ color: "#e8ebef" }}>{t("darkBg")}</span>
+              </button>
             </div>
-            {msg.text && (
-              <p className={`text-xs mt-2.5 ${msg.type === "error" ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>{msg.text}</p>
-            )}
-            <button
-              type="button"
-              onClick={submitPassword}
-              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: accent }}
-            >
-              {t("save")}
-            </button>
-          </div>
-        )}
+            <div className="flex flex-wrap gap-2.5">
+              {ACCENT_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setAccent(p.value)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-90"
+                  style={{ backgroundColor: p.value, boxShadow: accent === p.value ? `0 0 0 2px var(--bg-panel), 0 0 0 4px ${p.value}` : "none" }}
+                  aria-label={p.name}
+                >
+                  {accent === p.value && <Check size={14} className="text-[#12161c]" />}
+                </button>
+              ))}
+            </div>
+          </AccordionRow>
 
-        {page === "language" && (
-          <div className="px-5 pt-5 pb-8">
+          <AccordionRow
+            icon={<Type size={16} className="text-[var(--text-muted)]" />}
+            label={t("fontSize")}
+            valueHint={currentFontLabel}
+            isOpen={section === "font"}
+            onToggle={() => toggle("font")}
+          >
+            <div className="flex gap-2">
+              {FONT_SCALES.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setFontScale(f.value)}
+                  className="flex-1 py-2.5 rounded-lg text-xs font-medium transition-colors"
+                  style={
+                    fontScale === f.value
+                      ? { backgroundColor: accent, color: "#12161c" }
+                      : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }
+                  }
+                >
+                  {t(f.key)}
+                </button>
+              ))}
+            </div>
+          </AccordionRow>
+
+          <AccordionRow
+            icon={<Globe size={16} className="text-[var(--text-muted)]" />}
+            label={t("language")}
+            valueHint={currentLangLabel}
+            isOpen={section === "lang"}
+            onToggle={() => toggle("lang")}
+          >
             <div className="flex flex-col gap-2">
               {LANGS.map((l) => (
                 <button
@@ -946,56 +971,47 @@ function ProfileDrawer({
                 </button>
               ))}
             </div>
-          </div>
-        )}
+          </AccordionRow>
 
-        {page === "advanced" && (
-          <div className="px-5 pt-5 pb-8">
-            {!confirmDeleteAcc ? (
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteAcc(true)}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[var(--bad-soft)] text-[var(--bad)] text-xs font-medium hover:opacity-90 transition-opacity"
-              >
-                <UserX size={14} /> {t("deleteAccount")}
-              </button>
-            ) : (
-              <div className="bg-[var(--bad-soft)] border border-[var(--bad)]/30 rounded-lg p-3.5">
-                <p className="text-[var(--bad)] text-xs mb-2.5">
-                  {isAdmin ? t("confirmDeleteAccountAdmin") : t("confirmDeleteAccountEmployee")}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={onDeleteAccount}
-                    className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
-                  >
-                    {t("yesDeleteAccount")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDeleteAcc(false)}
-                    className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
-                  >
-                    {t("cancel")}
-                  </button>
-                </div>
-              </div>
+          <AccordionRow
+            icon={<Lock size={16} className="text-[var(--text-muted)]" />}
+            label={t("security")}
+            isOpen={section === "security"}
+            onToggle={() => toggle("security")}
+          >
+            <div className="space-y-3">
+              <Field label={t("currentPassword")} type="password" value={currentPw} onChange={setCurrentPw} />
+              <Field label={t("newLogin")} value={newUsername} onChange={setNewUsername} />
+              <Field label={t("newPassword")} type="password" value={newPw} onChange={setNewPw} />
+              <Field label={t("repeatNewPassword")} type="password" value={newPw2} onChange={setNewPw2} />
+            </div>
+            {msg.text && (
+              <p className={`text-xs mt-2.5 ${msg.type === "error" ? "text-[#e2685f]" : "text-[#5cbf8f]"}`}>{msg.text}</p>
             )}
-          </div>
-        )}
+            <button
+              type="button"
+              onClick={submitPassword}
+              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: accent }}
+            >
+              {t("save")}
+            </button>
+          </AccordionRow>
+        </div>
+        <div className="h-5" />
       </div>
     </>
   );
 }
 
+// ---------- ADMIN ----------
 function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
   newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  changeOwnCredentials, updateAvatar, updateOwnPhone, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1012,7 +1028,7 @@ function AdminApp({
   const [weekOffset, setWeekOffset] = useState(0);
   const dateStrip = (() => {
     const today = new Date();
-    const day = today.getDay();
+    const day = today.getDay(); // 0 = Sunday ... 6 = Saturday
     const mondayOffset = day === 0 ? -6 : 1 - day;
     const monday = new Date(today);
     monday.setDate(today.getDate() + mondayOffset + weekOffset * 7);
@@ -1032,7 +1048,7 @@ function AdminApp({
             type="button"
             onClick={() => setAdminTab(tab.id)}
             className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors"
-            style={{ color: adminTab === tab.id ? accent : "var(--text-muted)" }}
+            style={{ color: adminTab === tab.id ? accent : "#6b7684" }}
           >
             {tab.icon}
             {tab.label}
@@ -1047,13 +1063,13 @@ function AdminApp({
       <ProfileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        me={{ name: currentUser.username, username: currentUser.username, password: myAdmin.password, avatar: myAdmin.avatar }}
+        me={{ name: currentUser.username, username: currentUser.username, password: myAdmin.password, avatar: myAdmin.avatar, phone: myAdmin.phone || "" }}
         roleLabel={t("adminPanel")}
-        isAdmin={true}
-        onDeleteAccount={deleteOwnAccount}
-        onLogout={onLogout}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
+        updateOwnPhone={updateOwnPhone}
+        deleteOwnAccount={deleteOwnAccount}
+        onDeleted={onLogout}
         accent={accent} setAccent={setAccent}
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
@@ -1063,7 +1079,10 @@ function AdminApp({
         title={t("adminPanel")}
         userName={currentUser.username}
         avatar={myAdmin.avatar || null}
+        onLogout={onLogout}
         onTitleClick={() => setDrawerOpen(true)}
+        onMenuClick={() => setDrawerOpen(true)}
+        mode={mode} setMode={setMode}
         bottomNav={bottomNav}
       >
       {adminTab === "employees" && (
@@ -1077,7 +1096,7 @@ function AdminApp({
               <UserPlus size={16} /> {t("addEmployeeHeader")}
             </button>
           ) : (
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                   <UserPlus size={15} /> {t("addEmployeeHeader")}
@@ -1092,7 +1111,7 @@ function AdminApp({
                 <Field label={t("login")} value={newEmp.username} onChange={(v) => setNewEmp({ ...newEmp, username: v })} />
                 <Field label={t("password")} type="password" value={newEmp.password} onChange={(v) => setNewEmp({ ...newEmp, password: v })} />
               </div>
-              {empError && <p className="text-[var(--bad)] text-xs mt-3">{empError}</p>}
+              {empError && <p className="text-[#e2685f] text-xs mt-3">{empError}</p>}
               <button
                 type="button"
                 onClick={async () => { await addEmployee(); setShowAddForm(false); }}
@@ -1117,7 +1136,7 @@ function AdminApp({
 
       {adminTab === "attendance" && (
         <div className="space-y-4">
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                 <Calendar size={15} /> {t("markAttendanceHeader")}
@@ -1148,12 +1167,12 @@ function AdminApp({
                     : markedCount === 0
                       ? "var(--border-input)"
                       : markedCount < myEmployees.length
-                        ? "var(--warn)"
-                        : "var(--good)";
+                        ? "#d9b23c"
+                        : "#5cbf8f";
                   const style = isFuture
                     ? { backgroundColor: "var(--bg-app)", color: "var(--text-faint)", border: "1px solid var(--border-input)", opacity: 0.45 }
                     : isToday
-                      ? { backgroundColor: "var(--good)", color: "#0e1712", boxShadow: isSelected ? `0 0 0 2px var(--bg-card), 0 0 0 4px ${accent}` : "none" }
+                      ? { backgroundColor: "#5cbf8f", color: "#0e1712", boxShadow: isSelected ? `0 0 0 2px var(--bg-card), 0 0 0 4px ${accent}` : "none" }
                       : isSelected
                         ? { backgroundColor: accent, color: "#12161c" }
                         : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" };
@@ -1189,14 +1208,14 @@ function AdminApp({
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
             )}
             {myEmployees.length > 0 && attDate > todayISO() && (
-              <p className="text-[var(--warn)] text-xs text-center py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">{t("futureDateWarning")}</p>
+              <p className="text-[#d9b23c] text-xs text-center py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">{t("futureDateWarning")}</p>
             )}
             {myEmployees.map((emp) => {
               const st = attEntryStatus(attendance[emp.id]?.[attDate]);
               const hasEntry = attendance[emp.id]?.[attDate] !== undefined;
               const isFuture = attDate > todayISO();
               return (
-                <div key={emp.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm">
+                <div key={emp.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5">
                   <div className="flex items-center gap-2.5 mb-3">
                     <Avatar src={emp.avatar} name={emp.name} size={32} />
                     <div className="min-w-0">
@@ -1210,7 +1229,7 @@ function AdminApp({
                       disabled={isFuture}
                       onClick={() => markAttendance(emp.id, 1)}
                       className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={st === 1 ? { backgroundColor: "var(--good)", color: "#0e1712" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+                      style={st === 1 ? { backgroundColor: "#5cbf8f", color: "#0e1712" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
                     >
                       <CheckCircle2 size={13} /> {t("fullDay")}
                     </button>
@@ -1219,7 +1238,7 @@ function AdminApp({
                       disabled={isFuture}
                       onClick={() => markAttendance(emp.id, 0.5)}
                       className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={st === 0.5 ? { backgroundColor: "var(--warn)", color: "#1a1608" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+                      style={st === 0.5 ? { backgroundColor: "#d9b23c", color: "#1a1608" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
                     >
                       <Calendar size={13} /> {t("halfDay")}
                     </button>
@@ -1228,7 +1247,7 @@ function AdminApp({
                       disabled={isFuture}
                       onClick={() => markAttendance(emp.id, 0)}
                       className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={st === 0 && hasEntry ? { backgroundColor: "var(--bad)", color: "#1c0e0c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+                      style={st === 0 && hasEntry ? { backgroundColor: "#e2685f", color: "#1c0e0c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
                     >
                       <XCircle size={13} /> {t("absent")}
                     </button>
@@ -1242,7 +1261,7 @@ function AdminApp({
 
       {adminTab === "advances" && (
         <div className="space-y-5">
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
             <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold mb-4">
               <Wallet size={15} /> {t("giveAdvanceHeader")}
             </div>
@@ -1285,23 +1304,23 @@ function AdminApp({
           </div>
 
           {advEmp && (
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
               <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("advanceHistory")}</div>
               {(advances[advEmp] || []).length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvances")}</p>}
               <div className="space-y-2">
                 {(advances[advEmp] || []).slice().reverse().map((a) => (
                   <div key={a.id} className="flex items-center justify-between text-sm py-1.5">
                     <div>
-                      <span className="text-[var(--text-primary)] font-mono tabular-nums">{fmt(a.amount)}</span>
+                      <span className="text-[var(--text-primary)]">{fmt(a.amount)}</span>
                       <span
                         className="text-[9px] uppercase tracking-wide ml-2 px-1.5 py-0.5 rounded"
-                        style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                        style={a.type === "salary" ? { backgroundColor: "rgba(92,191,143,0.15)", color: "#5cbf8f" } : { backgroundColor: "rgba(217,178,60,0.15)", color: "#d9b23c" }}
                       >
                         {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
                       </span>
                       <span className="text-[var(--text-muted)] text-xs ml-2">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
                     </div>
-                    <button onClick={() => deleteAdvance(advEmp, a.id)} className="text-[var(--text-muted)] hover:text-[var(--bad)]">
+                    <button onClick={() => deleteAdvance(advEmp, a.id)} className="text-[var(--text-muted)] hover:text-[#e2685f]">
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -1313,7 +1332,7 @@ function AdminApp({
       )}
 
       {adminTab === "report" && (
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden">
           <div className="p-5 pb-3 text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
             <ClipboardList size={15} /> {t("reportHeader")}
           </div>
@@ -1334,10 +1353,10 @@ function AdminApp({
                   return (
                     <tr key={emp.id} className="border-t border-[var(--border-soft)]">
                       <td className="py-2.5 px-5 text-[var(--text-primary)]">{emp.name}</td>
-                      <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmtDays(s.workedDays)}</td>
-                      <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmt(s.totalWage)}</td>
-                      <td className="py-2.5 px-3 text-right text-[var(--bad)] font-mono tabular-nums">-{fmt(s.totalAdvance)}</td>
-                      <td className="py-2.5 px-5 text-right font-semibold text-[var(--good)] font-mono tabular-nums">{fmt(s.remaining)}</td>
+                      <td className="py-2.5 px-3 text-right text-[var(--text-secondary)]">{fmtDays(s.workedDays)}</td>
+                      <td className="py-2.5 px-3 text-right text-[var(--text-secondary)]">{fmt(s.totalWage)}</td>
+                      <td className="py-2.5 px-3 text-right text-[#e2685f]">-{fmt(s.totalAdvance)}</td>
+                      <td className="py-2.5 px-5 text-right font-semibold text-[#5cbf8f]">{fmt(s.remaining)}</td>
                     </tr>
                   );
                 })}
@@ -1354,9 +1373,10 @@ function AdminApp({
   );
 }
 
+// ---------- EMPLOYEE ----------
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  changeOwnCredentials, updateAvatar, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { t } = useApp();
@@ -1372,9 +1392,6 @@ function EmployeeApp({
         onClose={() => setDrawerOpen(false)}
         me={{ name: s.emp.name, username: s.emp.username, password: s.emp.password, avatar: s.emp.avatar }}
         roleLabel={t("employeePanel")}
-        isAdmin={false}
-        onDeleteAccount={deleteOwnAccount}
-        onLogout={onLogout}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
         accent={accent} setAccent={setAccent}
@@ -1386,6 +1403,7 @@ function EmployeeApp({
         title={t("employeePanel")}
         userName={currentUser.name}
         avatar={s.emp.avatar || null}
+        onLogout={onLogout}
         onTitleClick={() => setDrawerOpen(true)}
       >
         <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
@@ -1398,7 +1416,7 @@ function EmployeeApp({
           <Stat label={t("typeSalary")} value={fmt(s.totalSalaryPaid)} tone="bad" icon={<Wallet size={12} />} />
         </div>
 
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-5 shadow-sm">
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-5">
           <div className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center justify-between">
             <span>{t("myWorkedDays")}</span>
             <span className="text-[var(--text-muted)] text-xs font-normal">{s.emp.dailyWage ? fmt(s.emp.dailyWage) + t("perDay") : ""}</span>
@@ -1409,30 +1427,30 @@ function EmployeeApp({
               <div key={date} className="flex items-center justify-between text-sm py-1">
                 <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
                   {v === 0 ? (
-                    <XCircle size={13} className="text-[var(--bad)]" />
+                    <XCircle size={13} className="text-[#e2685f]" />
                   ) : (
-                    <CheckCircle2 size={13} className={v === 1 ? "text-[var(--good)]" : "text-[var(--warn)]"} />
+                    <CheckCircle2 size={13} className={v === 1 ? "text-[#5cbf8f]" : "text-[#d9b23c]"} />
                   )}
-                  {date} {v === 0.5 && <span className="text-[10px] text-[var(--warn)]">({t("halfDay")})</span>}
-                  {v === 0 && <span className="text-[10px] text-[var(--bad)]">({t("absent")})</span>}
+                  {date} {v === 0.5 && <span className="text-[10px] text-[#d9b23c]">({t("halfDay")})</span>}
+                  {v === 0 && <span className="text-[10px] text-[#e2685f]">({t("absent")})</span>}
                 </span>
-                <span className={`font-mono tabular-nums ${v === 0 ? "text-[var(--bad)] text-xs" : "text-[var(--text-muted)] text-xs"}`}>{fmt(v * wage)}</span>
+                <span className={v === 0 ? "text-[#e2685f] text-xs" : "text-[var(--text-muted)] text-xs"}>{fmt(v * wage)}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
           <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("myAdvances")}</div>
           {s.advList.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>}
           <div className="space-y-2">
             {s.advList.slice().reverse().map((a) => (
               <div key={a.id} className="flex items-center justify-between text-sm py-1">
                 <span className="text-[var(--text-primary)] flex items-center gap-2">
-                  <span className="font-mono tabular-nums">{fmt(a.amount)}</span>
+                  {fmt(a.amount)}
                   <span
                     className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded"
-                    style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                    style={a.type === "salary" ? { backgroundColor: "rgba(92,191,143,0.15)", color: "#5cbf8f" } : { backgroundColor: "rgba(217,178,60,0.15)", color: "#d9b23c" }}
                   >
                     {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
                   </span>
@@ -1447,6 +1465,7 @@ function EmployeeApp({
   );
 }
 
+// ---------- ROOT ----------
 export default function WorkforceApp() {
   const [loading, setLoading] = useState(true);
   const [usersData, setUsersData] = useState(null);
@@ -1460,12 +1479,16 @@ export default function WorkforceApp() {
       return null;
     }
   });
+  // Wraps setCurrentUser so the logged-in session survives a page reload
+  // (e.g. pull-to-refresh) instead of dropping the person back to the
+  // login screen every time.
   function setCurrentUser(user) {
     setCurrentUserState(user);
     try {
       if (user) localStorage.setItem("current-user", JSON.stringify(user));
       else localStorage.removeItem("current-user");
     } catch (e) {
+      // ignore storage errors (e.g. private browsing)
     }
   }
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
@@ -1484,10 +1507,16 @@ export default function WorkforceApp() {
 
   useEffect(() => {
     init();
+    // Safety net: never let the app hang on the loading screen forever,
+    // even if a storage call never resolves.
     const timer = setTimeout(() => setLoading(false), 4000);
     return () => clearTimeout(timer);
   }, []);
 
+  // Live sync: whenever ANY device saves users/attendance/advances data,
+  // every other open screen picks up the change automatically — no manual
+  // refresh needed. Falls back gracefully (just does nothing) if realtime
+  // isn't enabled on the Supabase table.
   useEffect(() => {
     const channel = supabase
       .channel("app_storage_live")
@@ -1502,6 +1531,7 @@ export default function WorkforceApp() {
             else if (row.key === "attendance-data") setAttendance(JSON.parse(row.value));
             else if (row.key === "advances-data") setAdvances(JSON.parse(row.value));
           } catch (e) {
+            // ignore malformed payloads
           }
         }
       )
@@ -1511,6 +1541,9 @@ export default function WorkforceApp() {
     };
   }, []);
 
+  // Apply the chosen font size by scaling the real root font-size, so every
+  // rem-based Tailwind text class scales correctly — unlike CSS `zoom`,
+  // this never breaks `position: fixed` elements like the bottom nav.
   useEffect(() => {
     if (typeof document !== "undefined" && document.documentElement) {
       document.documentElement.style.fontSize = fontScale + "%";
@@ -1534,6 +1567,8 @@ export default function WorkforceApp() {
       usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: [] };
       await safeSet("users-data", JSON.stringify(usersVal));
     } else if (usersVal.admin && !usersVal.admins) {
+      // Migrate old single-admin data shape to the new multi-admin shape,
+      // without losing the existing admin's login or employees.
       const owner = usersVal.admin.username;
       usersVal = {
         admins: { [owner]: { password: usersVal.admin.password, avatar: usersVal.admin.avatar || null } },
@@ -1546,6 +1581,9 @@ export default function WorkforceApp() {
     }
     setUsersData(usersVal);
 
+    // If this device had a saved session but the account no longer exists
+    // (e.g. deleted or renamed from another device), sign out safely
+    // instead of showing a broken/empty screen.
     setCurrentUserState((prevUser) => {
       if (!prevUser) return prevUser;
       const stillValid = prevUser.role === "admin"
@@ -1614,6 +1652,8 @@ export default function WorkforceApp() {
     }
   }
 
+  // Anyone can create their own manager account — each admin only ever
+  // sees and manages the employees they personally created.
   function registerAdmin(newUsername, newPassword) {
     const admins = usersData.admins || {};
     if (!newUsername || !newUsername.trim()) return { error: makeT(lang)("errEmptyLogin") };
@@ -1649,7 +1689,7 @@ export default function WorkforceApp() {
     const advList = advances[empId] || [];
     const totalAvans = advList.filter((a) => a.type !== "salary").reduce((sum, a) => sum + Number(a.amount), 0);
     const totalSalaryPaid = advList.filter((a) => a.type === "salary").reduce((sum, a) => sum + Number(a.amount), 0);
-    const totalAdvance = totalAvans + totalSalaryPaid;
+    const totalAdvance = totalAvans + totalSalaryPaid; // combined, kept for backward compatibility
     return { emp, workedDays, totalWage, totalAdvance, totalAvans, totalSalaryPaid, remaining: totalWage - totalAdvance, advList, att };
   }
 
@@ -1687,10 +1727,17 @@ export default function WorkforceApp() {
     if (advEmp === id) setAdvEmp("");
   }
 
+  // Changing the wage only affects days marked from today onward — days
+  // already worked keep the rate that was active when they were marked,
+  // by recording each change in the employee's wage history.
   async function updateEmployeeWage(id, newWage) {
     const target = usersData.employees.find((x) => x.id === id);
     if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
     const today = todayISO();
+    // If this employee has no wage history yet (created before this
+    // feature existed), seed it with their old rate starting from the
+    // very beginning — so past days keep being calculated at the old
+    // rate, and only today onward uses the new one.
     const history = Array.isArray(target.wageHistory) && target.wageHistory.length > 0
       ? target.wageHistory
       : [{ date: "2000-01-01", wage: target.dailyWage }];
@@ -1701,12 +1748,16 @@ export default function WorkforceApp() {
   }
 
   async function markAttendance(empId, status) {
-    if (attDate > todayISO()) return;
+    if (attDate > todayISO()) return; // safety guard — future dates can't be marked
     const dayMap = { ...(attendance[empId] || {}) };
     const currentStatus = attEntryStatus(dayMap[attDate]);
     if (dayMap[attDate] !== undefined && currentStatus === status) {
-      delete dayMap[attDate];
+      delete dayMap[attDate]; // clicking the active status again clears it
     } else {
+      // Snapshot today's wage rate right into the entry. This way, if the
+      // wage is changed later, everything already marked keeps the rate
+      // that was active the moment it was recorded — no matter which
+      // calendar date the attendance itself is for.
       const emp = usersData.employees.find((e) => e.id === empId);
       dayMap[attDate] = { v: status, wage: Number(emp ? emp.dailyWage : 0) };
     }
@@ -1726,6 +1777,7 @@ export default function WorkforceApp() {
     await persistAdvances({ ...advances, [empId]: list });
   }
 
+  // Works for whichever role is currently logged in.
   function changeOwnCredentials(newUsername, newPassword) {
     if (!currentUser) return { error: "—" };
     if (currentUser.role === "admin") {
@@ -1737,6 +1789,7 @@ export default function WorkforceApp() {
       const data = admins[oldUsername];
       delete admins[oldUsername];
       admins[newUsername] = { ...data, password: newPassword };
+      // Keep this admin's employees pointing at them under their new username.
       const employees = usersData.employees.map((e) => (e.owner === oldUsername ? { ...e, owner: newUsername } : e));
       persistUsers({ ...usersData, admins, employees });
       setCurrentUser({ role: "admin", name: currentUser.name, username: newUsername });
@@ -1750,25 +1803,6 @@ export default function WorkforceApp() {
     return {};
   }
 
-  async function deleteOwnAccount() {
-    if (!currentUser) return;
-    if (currentUser.role === "admin") {
-      const admins = { ...usersData.admins };
-      delete admins[currentUser.username];
-      const ownedIds = usersData.employees.filter((e) => e.owner === currentUser.username).map((e) => e.id);
-      const employees = usersData.employees.filter((e) => e.owner !== currentUser.username);
-      await persistUsers({ ...usersData, admins, employees });
-      const att2 = { ...attendance }; ownedIds.forEach((id) => delete att2[id]); await persistAttendance(att2);
-      const adv2 = { ...advances }; ownedIds.forEach((id) => delete adv2[id]); await persistAdvances(adv2);
-    } else {
-      const employees = usersData.employees.filter((e) => e.id !== currentUser.id);
-      await persistUsers({ ...usersData, employees });
-      const att2 = { ...attendance }; delete att2[currentUser.id]; await persistAttendance(att2);
-      const adv2 = { ...advances }; delete adv2[currentUser.id]; await persistAdvances(adv2);
-    }
-    logout();
-  }
-
   async function updateAvatar(dataUrl) {
     if (!currentUser) return;
     if (currentUser.role === "admin") {
@@ -1780,11 +1814,57 @@ export default function WorkforceApp() {
     }
   }
 
+  async function updateOwnPhone(phone) {
+    if (!currentUser) return;
+    if (currentUser.role === "admin") {
+      const admins = { ...usersData.admins, [currentUser.username]: { ...usersData.admins[currentUser.username], phone } };
+      await persistUsers({ ...usersData, admins });
+    } else {
+      const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, phone } : e));
+      await persistUsers({ ...usersData, employees });
+    }
+  }
+
+  // Lets a person permanently remove their own account. For an admin this
+  // also removes every employee they own (and that data's attendance /
+  // advances), since those records only make sense under that admin.
+  async function deleteOwnAccount(password) {
+    if (!currentUser) return { error: "—" };
+    if (currentUser.role === "admin") {
+      const me = usersData.admins[currentUser.username];
+      if (!me || me.password !== password) return { error: makeT(lang)("errWrongCurrentPassword") };
+      const ownedIds = usersData.employees.filter((e) => e.owner === currentUser.username).map((e) => e.id);
+      const admins = { ...usersData.admins };
+      delete admins[currentUser.username];
+      const employees = usersData.employees.filter((e) => e.owner !== currentUser.username);
+      await persistUsers({ ...usersData, admins, employees });
+      const att2 = { ...attendance }; ownedIds.forEach((id) => delete att2[id]); await persistAttendance(att2);
+      const adv2 = { ...advances }; ownedIds.forEach((id) => delete adv2[id]); await persistAdvances(adv2);
+    } else {
+      const me = usersData.employees.find((e) => e.id === currentUser.id);
+      if (!me || me.password !== password) return { error: makeT(lang)("errWrongCurrentPassword") };
+      const employees = usersData.employees.filter((e) => e.id !== currentUser.id);
+      await persistUsers({ ...usersData, employees });
+      const att2 = { ...attendance }; delete att2[currentUser.id]; await persistAttendance(att2);
+      const adv2 = { ...advances }; delete adv2[currentUser.id]; await persistAdvances(adv2);
+    }
+    setCurrentUser(null);
+    return {};
+  }
+
   const t = makeT(lang);
 
   let screen;
   if (loading) {
-    screen = <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)] text-[var(--text-secondary)] text-sm">{t("loading")}</div>;
+    screen = (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-app)]">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center animate-pulse" style={{ backgroundColor: accent }}>
+          <ShieldCheck size={30} className="text-[#12161c]" />
+        </div>
+        <div className="text-[var(--text-primary)] font-semibold text-base tracking-tight">{t("appName")}</div>
+        <div className="text-[var(--text-muted)] text-xs">{t("loading")}</div>
+      </div>
+    );
   } else if (!currentUser) {
     screen = (
       <LoginScreen
@@ -1823,6 +1903,7 @@ export default function WorkforceApp() {
         deleteAdvance={deleteAdvance}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
+        updateOwnPhone={updateOwnPhone}
         deleteOwnAccount={deleteOwnAccount}
         accent={accent} setAccent={setAccent}
         mode={mode} setMode={setMode}
@@ -1839,6 +1920,7 @@ export default function WorkforceApp() {
         onLogout={logout}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
+        updateOwnPhone={updateOwnPhone}
         deleteOwnAccount={deleteOwnAccount}
         accent={accent} setAccent={setAccent}
         mode={mode} setMode={setMode}
@@ -1850,26 +1932,7 @@ export default function WorkforceApp() {
 
   return (
     <AppContext.Provider value={{ accent, lang, t }}>
-      <div
-        className="font-sans"
-        style={{
-          ...PALETTES[mode],
-          "--accent": accent,
-          "--good": mode === "dark" ? "#4fb587" : "#2f9463",
-          "--good-soft": "rgba(79,181,135,0.15)",
-          "--bad": mode === "dark" ? "#e2685f" : "#d1453b",
-          "--bad-soft": mode === "dark" ? "rgba(226,104,95,0.14)" : "rgba(209,69,59,0.1)",
-          "--warn": mode === "dark" ? "#d9a53c" : "#b8811f",
-          "--warn-soft": "rgba(217,165,60,0.15)",
-          fontFamily: "'Manrope', system-ui, -apple-system, sans-serif",
-        }}
-      >
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Manrope:ital@0;1&subset=cyrillic&display=swap');
-          .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
-        `}</style>
-        {screen}
-      </div>
+      <div style={{ ...PALETTES[mode], "--accent": accent }}>{screen}</div>
     </AppContext.Provider>
   );
 }
