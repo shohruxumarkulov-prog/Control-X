@@ -15,10 +15,6 @@ const fmtDays = (n) => {
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 };
 
-// Finds the daily wage that was in effect on a given date, using the
-// employee's wage history (each entry marks the date a new rate started).
-// Falls back to the employee's current dailyWage if there's no history yet
-// (older data created before this feature existed).
 function wageForDate(emp, date) {
   const history = emp.wageHistory;
   if (!Array.isArray(history) || history.length === 0) return Number(emp.dailyWage || 0);
@@ -30,9 +26,6 @@ function wageForDate(emp, date) {
   return Number(applicable.wage);
 }
 
-// An attendance entry can be a plain number/boolean (older data, before
-// per-entry wage snapshots existed) or an object { v, wage } (current
-// format). These two helpers read either shape safely.
 function attEntryStatus(raw) {
   if (raw && typeof raw === "object") return raw.v;
   if (typeof raw === "number") return raw;
@@ -41,10 +34,9 @@ function attEntryStatus(raw) {
 }
 function attEntryWage(raw, emp, date) {
   if (raw && typeof raw === "object" && typeof raw.wage === "number") return raw.wage;
-  return wageForDate(emp, date); // legacy fallback — best guess from wage history
+  return wageForDate(emp, date);
 }
 
-// ---------- i18n ----------
 const LANGS = [
   { code: "uz", label: "O'zbekcha" },
   { code: "ru", label: "Русский" },
@@ -182,7 +174,6 @@ function makeT(lang) {
   };
 }
 
-// ---------- App-wide context (theme + language) ----------
 const AppContext = createContext({ accent: "#c98a4b", lang: "uz", t: makeT("uz") });
 const useApp = () => useContext(AppContext);
 
@@ -228,14 +219,8 @@ const PALETTES = {
   },
 };
 
-// Default admin — used both as the initial seed and as an absolute
-// fallback so login always works even if the storage layer never
-// loads for any reason.
 const ADMIN_DEFAULT = { username: "admin", password: "admin123" };
 
-// In-memory fallback store. If Supabase is unreachable (offline, network
-// error), everything still works for the current session — it just
-// won't survive a page refresh until the connection comes back.
 const memoryStore = {};
 
 async function safeGet(key) {
@@ -250,7 +235,6 @@ async function safeGet(key) {
       return data.value;
     }
   } catch (e) {
-    // fall through to memory
   }
   return memoryStore[key];
 }
@@ -260,12 +244,9 @@ async function safeSet(key, value) {
   try {
     await supabase.from("app_storage").upsert({ key, value, updated_at: new Date().toISOString() });
   } catch (e) {
-    // already saved in memory, ignore
   }
 }
 
-// Resize/crop an image file to a small square JPEG data URL so it stays
-// well under storage size limits.
 function fileToAvatarDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -290,7 +271,6 @@ function fileToAvatarDataUrl(file) {
   });
 }
 
-// ---------- SMALL REUSABLE PIECES ----------
 function Field({ label, value, onChange, type = "text" }) {
   const [reveal, setReveal] = useState(false);
   const isPassword = type === "password";
@@ -318,11 +298,6 @@ function Field({ label, value, onChange, type = "text" }) {
   );
 }
 
-// A number input that groups digits by thousands as you type (1 000 000),
-// so entering large sums of money doesn't require carefully counting zeros.
-// `value`/`onChange` still carry the plain digit string (e.g. "1000000") —
-// only the on-screen display is formatted, so all the existing amount math
-// elsewhere in the app keeps working unchanged.
 function MoneyField({ label, value, onChange, suffix }) {
   const digits = String(value || "").replace(/\D/g, "");
   const display = digits ? Number(digits).toLocaleString("uz-UZ") : "";
@@ -375,7 +350,7 @@ function Avatar({ src, name, size = 40 }) {
   );
 }
 
-function Shell({ title, userName, avatar, onLogout, onTitleClick, bottomNav, children }) {
+function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
   const { accent } = useApp();
   return (
     <div className="min-h-screen bg-[var(--bg-app)] flex flex-col">
@@ -398,9 +373,6 @@ function Shell({ title, userName, avatar, onLogout, onTitleClick, bottomNav, chi
             <div className="text-[var(--text-muted)] text-xs leading-tight">{userName}</div>
           </div>
         </button>
-        <button onClick={onLogout} className="flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--bad)] text-xs transition-colors">
-          <LogOut size={14} /> {useApp().t("logout")}
-        </button>
       </header>
       <main className={`flex-1 p-5 max-w-4xl w-full mx-auto ${bottomNav ? "pb-28" : ""}`}>{children}</main>
       {bottomNav}
@@ -408,7 +380,6 @@ function Shell({ title, userName, avatar, onLogout, onTitleClick, bottomNav, chi
   );
 }
 
-// ---------- LOGIN ----------
 function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister }) {
   const [showPassword, setShowPassword] = useState(false);
   const [asAdmin, setAsAdmin] = useState(false);
@@ -541,7 +512,6 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   );
 }
 
-// ---------- EMPLOYEE ROW (with expandable "..." details panel) ----------
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
   const { t } = useApp();
@@ -551,7 +521,6 @@ function CopyButton({ text }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch (e) {
-      // clipboard unavailable — ignore silently, value is still visible on screen
     }
   }
   return (
@@ -746,28 +715,27 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
   );
 }
 
-// ---------- PROFILE DRAWER (role-aware: admin or employee) ----------
-function MenuRow({ icon, label, onClick }) {
+function MenuRow({ icon, label, onClick, danger }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="w-full flex items-center justify-between py-3.5 border-b border-[var(--border)] last:border-b-0 text-left"
     >
-      <span className="flex items-center gap-3 text-[var(--text-primary)] text-sm">{icon}{label}</span>
+      <span className={`flex items-center gap-3 text-sm ${danger ? "text-[var(--bad)]" : "text-[var(--text-primary)]"}`}>{icon}{label}</span>
       <ChevronRight size={16} className="text-[var(--text-muted)]" />
     </button>
   );
 }
 
 function ProfileDrawer({
-  open, onClose, me, roleLabel, isAdmin, onDeleteAccount,
+  open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
   changeOwnCredentials, updateAvatar,
   accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const { t } = useApp();
   const fileRef = useRef(null);
-  const [page, setPage] = useState(null); // null | "appearance" | "privacy" | "language" | "advanced"
+  const [page, setPage] = useState(null);
   const [currentPw, setCurrentPw] = useState("");
   const [newUsername, setNewUsername] = useState(me.username);
   const [newPw, setNewPw] = useState("");
@@ -786,7 +754,6 @@ function ProfileDrawer({
       const dataUrl = await fileToAvatarDataUrl(file);
       await updateAvatar(dataUrl);
     } catch (err) {
-      // ignore — avatar upload is best-effort
     }
     setAvatarBusy(false);
     if (fileRef.current) fileRef.current.value = "";
@@ -823,11 +790,9 @@ function ProfileDrawer({
 
   return (
     <>
-      {/* Backdrop: blurs the app content behind it, fully covers the right side */}
       {open && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
       )}
-      {/* Panel: fully opaque, slides in from the left, sits above the blurred backdrop */}
       <div
         className={`fixed top-0 left-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] border-r border-[var(--border)] shadow-2xl z-40 overflow-y-auto transition-transform duration-200 ${
           open ? "translate-x-0" : "-translate-x-full"
@@ -856,7 +821,6 @@ function ProfileDrawer({
         {!page && (
           <>
             <div className="px-5 pt-5">
-              {/* Profile identity + avatar — side by side */}
               <div className="flex items-center gap-3.5 pb-5">
                 <div className="relative shrink-0">
                   <Avatar src={me.avatar} name={me.name} size={56} />
@@ -879,12 +843,12 @@ function ProfileDrawer({
               </div>
             </div>
 
-            {/* Settings menu — each row opens its own sub-page */}
             <div className="px-5">
               <MenuRow icon={<Paintbrush size={18} className="text-[var(--accent)]" />} label={t("appearance")} onClick={() => setPage("appearance")} />
               <MenuRow icon={<ShieldCheck size={18} className="text-[var(--good)]" />} label={t("privacySecurity")} onClick={() => setPage("privacy")} />
               <MenuRow icon={<Globe size={18} className="text-[var(--accent)]" />} label={t("language")} onClick={() => setPage("language")} />
               <MenuRow icon={<Settings size={18} className="text-[var(--text-secondary)]" />} label={t("advanced")} onClick={() => setPage("advanced")} />
+              <MenuRow icon={<LogOut size={18} className="text-[var(--bad)]" />} label={t("logout")} onClick={onLogout} danger />
             </div>
             <div className="h-5" />
           </>
@@ -1021,7 +985,6 @@ function ProfileDrawer({
   );
 }
 
-// ---------- ADMIN ----------
 function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
@@ -1045,7 +1008,7 @@ function AdminApp({
   const [weekOffset, setWeekOffset] = useState(0);
   const dateStrip = (() => {
     const today = new Date();
-    const day = today.getDay(); // 0 = Sunday ... 6 = Saturday
+    const day = today.getDay();
     const mondayOffset = day === 0 ? -6 : 1 - day;
     const monday = new Date(today);
     monday.setDate(today.getDate() + mondayOffset + weekOffset * 7);
@@ -1084,6 +1047,7 @@ function AdminApp({
         roleLabel={t("adminPanel")}
         isAdmin={true}
         onDeleteAccount={deleteOwnAccount}
+        onLogout={onLogout}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
         accent={accent} setAccent={setAccent}
@@ -1095,7 +1059,6 @@ function AdminApp({
         title={t("adminPanel")}
         userName={currentUser.username}
         avatar={myAdmin.avatar || null}
-        onLogout={onLogout}
         onTitleClick={() => setDrawerOpen(true)}
         bottomNav={bottomNav}
       >
@@ -1387,7 +1350,6 @@ function AdminApp({
   );
 }
 
-// ---------- EMPLOYEE ----------
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
@@ -1408,6 +1370,7 @@ function EmployeeApp({
         roleLabel={t("employeePanel")}
         isAdmin={false}
         onDeleteAccount={deleteOwnAccount}
+        onLogout={onLogout}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
         accent={accent} setAccent={setAccent}
@@ -1419,7 +1382,6 @@ function EmployeeApp({
         title={t("employeePanel")}
         userName={currentUser.name}
         avatar={s.emp.avatar || null}
-        onLogout={onLogout}
         onTitleClick={() => setDrawerOpen(true)}
       >
         <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
@@ -1481,7 +1443,6 @@ function EmployeeApp({
   );
 }
 
-// ---------- ROOT ----------
 export default function WorkforceApp() {
   const [loading, setLoading] = useState(true);
   const [usersData, setUsersData] = useState(null);
@@ -1495,16 +1456,12 @@ export default function WorkforceApp() {
       return null;
     }
   });
-  // Wraps setCurrentUser so the logged-in session survives a page reload
-  // (e.g. pull-to-refresh) instead of dropping the person back to the
-  // login screen every time.
   function setCurrentUser(user) {
     setCurrentUserState(user);
     try {
       if (user) localStorage.setItem("current-user", JSON.stringify(user));
       else localStorage.removeItem("current-user");
     } catch (e) {
-      // ignore storage errors (e.g. private browsing)
     }
   }
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
@@ -1523,16 +1480,10 @@ export default function WorkforceApp() {
 
   useEffect(() => {
     init();
-    // Safety net: never let the app hang on the loading screen forever,
-    // even if a storage call never resolves.
     const timer = setTimeout(() => setLoading(false), 4000);
     return () => clearTimeout(timer);
   }, []);
 
-  // Live sync: whenever ANY device saves users/attendance/advances data,
-  // every other open screen picks up the change automatically — no manual
-  // refresh needed. Falls back gracefully (just does nothing) if realtime
-  // isn't enabled on the Supabase table.
   useEffect(() => {
     const channel = supabase
       .channel("app_storage_live")
@@ -1547,7 +1498,6 @@ export default function WorkforceApp() {
             else if (row.key === "attendance-data") setAttendance(JSON.parse(row.value));
             else if (row.key === "advances-data") setAdvances(JSON.parse(row.value));
           } catch (e) {
-            // ignore malformed payloads
           }
         }
       )
@@ -1557,9 +1507,6 @@ export default function WorkforceApp() {
     };
   }, []);
 
-  // Apply the chosen font size by scaling the real root font-size, so every
-  // rem-based Tailwind text class scales correctly — unlike CSS `zoom`,
-  // this never breaks `position: fixed` elements like the bottom nav.
   useEffect(() => {
     if (typeof document !== "undefined" && document.documentElement) {
       document.documentElement.style.fontSize = fontScale + "%";
@@ -1583,8 +1530,6 @@ export default function WorkforceApp() {
       usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: [] };
       await safeSet("users-data", JSON.stringify(usersVal));
     } else if (usersVal.admin && !usersVal.admins) {
-      // Migrate old single-admin data shape to the new multi-admin shape,
-      // without losing the existing admin's login or employees.
       const owner = usersVal.admin.username;
       usersVal = {
         admins: { [owner]: { password: usersVal.admin.password, avatar: usersVal.admin.avatar || null } },
@@ -1597,9 +1542,6 @@ export default function WorkforceApp() {
     }
     setUsersData(usersVal);
 
-    // If this device had a saved session but the account no longer exists
-    // (e.g. deleted or renamed from another device), sign out safely
-    // instead of showing a broken/empty screen.
     setCurrentUserState((prevUser) => {
       if (!prevUser) return prevUser;
       const stillValid = prevUser.role === "admin"
@@ -1668,8 +1610,6 @@ export default function WorkforceApp() {
     }
   }
 
-  // Anyone can create their own manager account — each admin only ever
-  // sees and manages the employees they personally created.
   function registerAdmin(newUsername, newPassword) {
     const admins = usersData.admins || {};
     if (!newUsername || !newUsername.trim()) return { error: makeT(lang)("errEmptyLogin") };
@@ -1705,7 +1645,7 @@ export default function WorkforceApp() {
     const advList = advances[empId] || [];
     const totalAvans = advList.filter((a) => a.type !== "salary").reduce((sum, a) => sum + Number(a.amount), 0);
     const totalSalaryPaid = advList.filter((a) => a.type === "salary").reduce((sum, a) => sum + Number(a.amount), 0);
-    const totalAdvance = totalAvans + totalSalaryPaid; // combined, kept for backward compatibility
+    const totalAdvance = totalAvans + totalSalaryPaid;
     return { emp, workedDays, totalWage, totalAdvance, totalAvans, totalSalaryPaid, remaining: totalWage - totalAdvance, advList, att };
   }
 
@@ -1743,17 +1683,10 @@ export default function WorkforceApp() {
     if (advEmp === id) setAdvEmp("");
   }
 
-  // Changing the wage only affects days marked from today onward — days
-  // already worked keep the rate that was active when they were marked,
-  // by recording each change in the employee's wage history.
   async function updateEmployeeWage(id, newWage) {
     const target = usersData.employees.find((x) => x.id === id);
     if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
     const today = todayISO();
-    // If this employee has no wage history yet (created before this
-    // feature existed), seed it with their old rate starting from the
-    // very beginning — so past days keep being calculated at the old
-    // rate, and only today onward uses the new one.
     const history = Array.isArray(target.wageHistory) && target.wageHistory.length > 0
       ? target.wageHistory
       : [{ date: "2000-01-01", wage: target.dailyWage }];
@@ -1764,16 +1697,12 @@ export default function WorkforceApp() {
   }
 
   async function markAttendance(empId, status) {
-    if (attDate > todayISO()) return; // safety guard — future dates can't be marked
+    if (attDate > todayISO()) return;
     const dayMap = { ...(attendance[empId] || {}) };
     const currentStatus = attEntryStatus(dayMap[attDate]);
     if (dayMap[attDate] !== undefined && currentStatus === status) {
-      delete dayMap[attDate]; // clicking the active status again clears it
+      delete dayMap[attDate];
     } else {
-      // Snapshot today's wage rate right into the entry. This way, if the
-      // wage is changed later, everything already marked keeps the rate
-      // that was active the moment it was recorded — no matter which
-      // calendar date the attendance itself is for.
       const emp = usersData.employees.find((e) => e.id === empId);
       dayMap[attDate] = { v: status, wage: Number(emp ? emp.dailyWage : 0) };
     }
@@ -1793,7 +1722,6 @@ export default function WorkforceApp() {
     await persistAdvances({ ...advances, [empId]: list });
   }
 
-  // Works for whichever role is currently logged in.
   function changeOwnCredentials(newUsername, newPassword) {
     if (!currentUser) return { error: "—" };
     if (currentUser.role === "admin") {
@@ -1805,7 +1733,6 @@ export default function WorkforceApp() {
       const data = admins[oldUsername];
       delete admins[oldUsername];
       admins[newUsername] = { ...data, password: newPassword };
-      // Keep this admin's employees pointing at them under their new username.
       const employees = usersData.employees.map((e) => (e.owner === oldUsername ? { ...e, owner: newUsername } : e));
       persistUsers({ ...usersData, admins, employees });
       setCurrentUser({ role: "admin", name: currentUser.name, username: newUsername });
@@ -1819,9 +1746,6 @@ export default function WorkforceApp() {
     return {};
   }
 
-  // Deletes the currently logged-in account. Admins take their own
-  // employees (and those employees' attendance/advance history) down
-  // with them; employees just remove their own record.
   async function deleteOwnAccount() {
     if (!currentUser) return;
     if (currentUser.role === "admin") {
