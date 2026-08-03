@@ -428,9 +428,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
       <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-2 justify-center mb-8">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
-              <ShieldCheck size={18} className="text-[#12161c]" />
-            </div>
+            <img src="/logo.svg" alt={t("appName")} className="w-9 h-9" />
             <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
           </div>
           <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7">
@@ -462,9 +460,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 justify-center mb-8">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
-            <ShieldCheck size={18} className="text-[#12161c]" />
-          </div>
+          <img src="/logo.svg" alt={t("appName")} className="w-9 h-9" />
           <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
         </div>
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7">
