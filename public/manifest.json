@@ -1,7 +1,7 @@
 {
-  "name": "Ish Nazorati",
-  "short_name": "Ish Nazorati",
-  "description": "Ishchilar, davomat va avanslarni boshqarish ilovasi",
+  "name": "Nazorat+",
+  "short_name": "Nazorat+",
+  "description": "Nazorat+ — ishchilar, davomat, avans va ish haqini oson boshqarish uchun bepul veb-ilova.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#12161c",
