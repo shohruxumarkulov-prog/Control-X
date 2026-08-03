@@ -1854,9 +1854,7 @@ export default function WorkforceApp() {
   if (loading) {
     screen = (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-app)]">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center animate-pulse" style={{ backgroundColor: accent }}>
-          <ShieldCheck size={30} className="text-[#12161c]" />
-        </div>
+        <img src="/logo.svg" alt={t("appName")} className="w-16 h-16 animate-pulse" />
         <div className="text-[var(--text-primary)] font-semibold text-base tracking-tight">{t("appName")}</div>
         <div className="text-[var(--text-muted)] text-xs">{t("loading")}</div>
       </div>
