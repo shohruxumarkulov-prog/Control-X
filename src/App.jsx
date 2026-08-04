@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Phone
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
@@ -62,7 +62,6 @@ const STR = {
   navReport: { uz: "Hisobot", ru: "Отчёт", en: "Report" },
   addEmployeeHeader: { uz: "Yangi ishchi qo'shish", ru: "Добавить сотрудника", en: "Add new employee" },
   fullName: { uz: "Ism familiya", ru: "Имя фамилия", en: "Full name" },
-  phone: { uz: "Telefon raqami", ru: "Номер телефона", en: "Phone number" },
   dailyWage: { uz: "Kunlik ish haqi (so'm)", ru: "Дневная зарплата (сум)", en: "Daily wage" },
   add: { uz: "Qo'shish", ru: "Добавить", en: "Add" },
   noEmployees: { uz: "Hali ishchilar qo'shilmagan", ru: "Сотрудники ещё не добавлены", en: "No employees added yet" },
@@ -639,18 +638,6 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
             </div>
           </div>
 
-          {emp.phone && (
-            <>
-              <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1">
-                <Phone size={12} /> {t("phone")}
-              </div>
-              <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg px-3 py-2">
-                <a href={`tel:${emp.phone}`} className="text-[var(--text-primary)] text-sm truncate">{emp.phone}</a>
-                <CopyButton text={emp.phone} />
-              </div>
-            </>
-          )}
-
           <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1 mt-1">
             <Wallet size={12} /> {t("dailyWage")}
           </div>
@@ -846,7 +833,6 @@ function ProfileDrawer({
                 <div className="min-w-0">
                   <div className="text-[var(--text-primary)] text-base font-semibold truncate">{me.name}</div>
                   <div className="text-[var(--text-muted)] text-sm truncate">{roleLabel}</div>
-                  {me.phone && <div className="text-[var(--text-muted)] text-xs truncate mt-0.5">{me.phone}</div>}
                 </div>
               </div>
             </div>
@@ -1092,7 +1078,6 @@ function AdminApp({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label={t("fullName")} value={newEmp.name} onChange={(v) => setNewEmp({ ...newEmp, name: v })} />
-                <Field label={t("phone")} value={newEmp.phone} onChange={(v) => setNewEmp({ ...newEmp, phone: v })} />
                 <MoneyField label={t("dailyWage")} value={newEmp.dailyWage} onChange={(v) => setNewEmp({ ...newEmp, dailyWage: v })} suffix="so'm" />
                 <Field label={t("login")} value={newEmp.username} onChange={(v) => setNewEmp({ ...newEmp, username: v })} />
                 <Field label={t("password")} type="password" value={newEmp.password} onChange={(v) => setNewEmp({ ...newEmp, password: v })} />
@@ -1375,7 +1360,7 @@ function EmployeeApp({
       <ProfileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        me={{ name: s.emp.name, username: s.emp.username, password: s.emp.password, avatar: s.emp.avatar, phone: s.emp.phone }}
+        me={{ name: s.emp.name, username: s.emp.username, password: s.emp.password, avatar: s.emp.avatar }}
         roleLabel={t("employeePanel")}
         isAdmin={false}
         onDeleteAccount={deleteOwnAccount}
@@ -1477,7 +1462,7 @@ export default function WorkforceApp() {
   const [loginError, setLoginError] = useState("");
 
   const [adminTab, setAdminTab] = useState("employees");
-  const [newEmp, setNewEmp] = useState({ name: "", username: "", password: "", dailyWage: "", phone: "" });
+  const [newEmp, setNewEmp] = useState({ name: "", username: "", password: "", dailyWage: "" });
   const [empError, setEmpError] = useState("");
   const [attDate, setAttDate] = useState(todayISO());
   const [advEmp, setAdvEmp] = useState("");
@@ -1676,12 +1661,11 @@ export default function WorkforceApp() {
         id, name: newEmp.name, username: newEmp.username,
         password: newEmp.password, dailyWage: wage, avatar: null,
         owner: currentUser.username,
-        phone: newEmp.phone || "",
         wageHistory: [{ date: todayISO(), wage }],
       }],
     };
     await persistUsers(updated);
-    setNewEmp({ name: "", username: "", password: "", dailyWage: "", phone: "" });
+    setNewEmp({ name: "", username: "", password: "", dailyWage: "" });
   }
 
   async function deleteEmployee(id) {
