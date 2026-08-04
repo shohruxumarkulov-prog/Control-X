@@ -372,7 +372,7 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
           </div>
         </button>
       </header>
-      <main className={`flex-1 p-5 max-w-4xl w-full mx-auto ${bottomNav ? "pb-28" : ""}`}>{children}</main>
+      <main className={`flex-1 p-5 max-w-4xl w-full mx-auto ${bottomNav ? "pb-32" : ""}`}>{children}</main>
       {bottomNav}
     </div>
   );
@@ -1017,15 +1017,15 @@ function AdminApp({
     });
   })();
 
-  const bottomNav = (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[var(--bg-card)]/90 backdrop-blur-md border-t border-[var(--border)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="max-w-4xl mx-auto flex">
+ const bottomNav = (
+    <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-3xl shadow-lg px-2 py-1.5">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setAdminTab(tab.id)}
-            className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors"
+            className="flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10px] font-medium transition-colors"
             style={{ color: adminTab === tab.id ? accent : "var(--text-muted)" }}
           >
             {tab.icon}
