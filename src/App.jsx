@@ -808,7 +808,7 @@ function ProfileDrawer({
             className="text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
             aria-label={t("themeColor")}
           >
-            {mode === "dark" ? <Moon size={20} /> : <Sun size={20} />}
+            {mode === "dark" ? <Sun size={20} /> : <Moon size={20} />}
           </button>
         </div>
 
