@@ -1068,7 +1068,7 @@ function AdminApp({
   newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, chatMessages, sendChatMessage, myId,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, chatMessages, sendChatMessage, myId, chatUnreadCount,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1111,10 +1111,15 @@ function AdminApp({
               style={{ color: active ? accent : "var(--text-muted)" }}
             >
               <span
-                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors relative"
                 style={active ? { backgroundColor: accent + "26" } : undefined}
               >
                 {tab.icon}
+                {tab.id === "chat" && chatUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--bad)] text-white text-[9px] font-bold flex items-center justify-center">
+                    {chatUnreadCount}
+                  </span>
+                )}
               </span>
               {tab.label}
             </button>
@@ -1447,7 +1452,7 @@ function AdminApp({
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
-  employeeTab, setEmployeeTab, chatMessages, sendChatMessage,
+  employeeTab, setEmployeeTab, chatMessages, sendChatMessage, chatUnreadCount,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { t } = useApp();
@@ -1473,10 +1478,15 @@ function EmployeeApp({
               style={{ color: active ? accent : "var(--text-muted)" }}
             >
               <span
-                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors relative"
                 style={active ? { backgroundColor: accent + "26" } : undefined}
               >
                 {tab.icon}
+                {tab.id === "chat" && chatUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--bad)] text-white text-[9px] font-bold flex items-center justify-center">
+                    {chatUnreadCount}
+                  </span>
+                )}
               </span>
               {tab.label}
             </button>
@@ -1687,6 +1697,14 @@ export default function WorkforceApp() {
       }
     })();
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const owner = chatOwnerFor(currentUser);
+    const myId = chatMyIdFor(currentUser);
+    if (currentUser.role === "admin" && adminTab === "chat") markChatSeen(owner, myId);
+    if (currentUser.role === "employee" && employeeTab === "chat") markChatSeen(owner, myId);
+  }, [adminTab, employeeTab, chatMessages, currentUser]);
   
   async function init() {
     let usersVal = null;
@@ -1822,6 +1840,37 @@ export default function WorkforceApp() {
   function chatOwnerFor(user) {
     if (!user) return null;
     return user.role === "admin" ? user.username : user.owner;
+  }
+
+  function chatOwnerFor(user) {
+    if (!user) return null;
+    return user.role === "admin" ? user.username : user.owner;
+  }
+
+  function chatMyIdFor(user) {
+    if (!user) return null;
+    return user.role === "admin" ? `admin:${user.username}` : user.id;
+  }
+
+  const [lastSeenChat, setLastSeenChat] = useState({});
+
+  function markChatSeen(owner, myId) {
+    if (!owner || !myId) return;
+    const key = `${owner}:${myId}`;
+    const now = Date.now();
+    setLastSeenChat((prev) => ({ ...prev, [key]: now }));
+    try { localStorage.setItem(`chat-seen-${key}`, String(now)); } catch (e) {}
+  }
+
+  function unreadChatCount(owner, myId) {
+    if (!owner || !myId) return 0;
+    const msgs = chatMessages[owner] || [];
+    const key = `${owner}:${myId}`;
+    let seen = lastSeenChat[key];
+    if (seen === undefined) {
+      try { seen = Number(localStorage.getItem(`chat-seen-${key}`)) || 0; } catch (e) { seen = 0; }
+    }
+    return msgs.filter((m) => m.ts > seen && m.senderId !== myId).length;
   }
 
   async function addEmployee() {
@@ -2026,6 +2075,7 @@ export default function WorkforceApp() {
         lang={lang} setLang={setLang}
         chatMessages={chatMessages}
         sendChatMessage={sendChatMessage}
+        chatUnreadCount={unreadChatCount(currentUser?.username, `admin:${currentUser?.username}`)}
       />
     );
   } else {
@@ -2045,6 +2095,7 @@ export default function WorkforceApp() {
         employeeTab={employeeTab} setEmployeeTab={setEmployeeTab}
         chatMessages={chatMessages}
         sendChatMessage={sendChatMessage}
+        chatUnreadCount={unreadChatCount(currentUser?.owner, currentUser?.id)}
       />
     );
   }
