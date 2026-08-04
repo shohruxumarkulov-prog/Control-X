@@ -1468,7 +1468,13 @@ export default function WorkforceApp() {
   const [advEmp, setAdvEmp] = useState("");
   const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "", type: "avans" });
   const [accent, setAccent] = useState(ACCENT_PRESETS[0].value);
-  const [mode, setMode] = useState("dark");
+ const [mode, setMode] = useState(() => {
+    try {
+      return localStorage.getItem("app-mode") || "dark";
+    } catch (e) {
+      return "dark";
+    }
+  });
   const [fontScale, setFontScale] = useState(100);
   const [lang, setLang] = useState("uz");
 
@@ -1500,6 +1506,12 @@ export default function WorkforceApp() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("app-mode", mode);
+    } catch (e) {}
+  }, [mode]);
 
   useEffect(() => {
     if (typeof document !== "undefined" && document.documentElement) {
