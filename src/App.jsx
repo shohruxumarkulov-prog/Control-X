@@ -1375,7 +1375,7 @@ function EmployeeApp({
       <ProfileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        me={{ name: s.emp.name, username: s.emp.username, password: s.emp.password, avatar: s.emp.avatar }}
+        me={{ name: s.emp.name, username: s.emp.username, password: s.emp.password, avatar: s.emp.avatar, phone: s.emp.phone }}
         roleLabel={t("employeePanel")}
         isAdmin={false}
         onDeleteAccount={deleteOwnAccount}
