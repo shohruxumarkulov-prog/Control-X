@@ -738,6 +738,10 @@ function ProfileDrawer({
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [confirmDeleteAcc, setConfirmDeleteAcc] = useState(false);
 
+  useEffect(() => {
+    if (!open) setPage(null);
+  }, [open]);
+
   const PAGE_TITLES = { appearance: t("appearance"), privacy: t("privacySecurity"), language: t("language"), advanced: t("advanced") };
 
   async function handleFile(e) {
