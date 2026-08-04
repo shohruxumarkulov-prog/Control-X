@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, MessageCircle, Send
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
@@ -164,6 +164,11 @@ const STR = {
   appearance: { uz: "Ko'rinish", ru: "Внешний вид", en: "Appearance" },
   privacySecurity: { uz: "Maxfiylik va xavfsizlik", ru: "Конфиденциальность и безопасность", en: "Privacy and Security" },
   advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
+  navChat: { uz: "Chat", ru: "Чат", en: "Chat" },
+  chatPlaceholder: { uz: "Xabar yozing...", ru: "Напишите сообщение...", en: "Type a message..." },
+  noMessages: { uz: "Hali xabar yo'q. Birinchi bo'lib yozing!", ru: "Сообщений пока нет. Напишите первым!", en: "No messages yet. Be the first to write!" },
+  chatGroupSubtitle: { uz: "Umumiy guruh", ru: "Общая группа", en: "Group chat" },
+  you: { uz: "Siz", ru: "Вы", en: "You" },
 };
 
 function makeT(lang) {
@@ -722,6 +727,80 @@ function MenuRow({ icon, label, onClick, danger }) {
   );
 }
 
+function ChatPanel({ messages, onSend, myId }) {
+  const [text, setText] = useState("");
+  const bottomRef = useRef(null);
+  const { accent, t } = useApp();
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  function handleSend() {
+    const value = text.trim();
+    if (!value) return;
+    onSend(value);
+    setText("");
+  }
+
+  return (
+    <div
+      className="flex flex-col bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden"
+      style={{ height: "calc(100vh - 260px)", minHeight: 380 }}
+    >
+      <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+        {messages.length === 0 && (
+          <p className="text-[var(--text-muted)] text-sm text-center py-10">{t("noMessages")}</p>
+        )}
+        {messages.map((m) => {
+          const mine = m.senderId === myId;
+          return (
+            <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[78%] rounded-2xl px-3.5 py-2 ${mine ? "rounded-br-md" : "rounded-bl-md"}`}
+                style={
+                  mine
+                    ? { backgroundColor: accent, color: "#12161c" }
+                    : { backgroundColor: "var(--bg-app)", border: "1px solid var(--border-input)", color: "var(--text-primary)" }
+                }
+              >
+                {!mine && (
+                  <div className="text-[10px] font-semibold mb-0.5 opacity-70">
+                    {m.senderName}{m.senderRole === "admin" ? ` · ${t("adminPanel")}` : ""}
+                  </div>
+                )}
+                <div className="text-sm whitespace-pre-wrap break-words leading-snug">{m.text}</div>
+                <div className={`text-[9px] mt-1 text-right ${mine ? "opacity-70" : "text-[var(--text-muted)]"}`}>
+                  {new Date(m.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+      <div className="p-3 border-t border-[var(--border)] flex items-center gap-2 bg-[var(--bg-panel)]">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+          placeholder={t("chatPlaceholder")}
+          className="flex-1 px-3.5 py-2.5 rounded-full bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
+        />
+        <button
+          type="button"
+          onClick={handleSend}
+          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-opacity hover:opacity-90 active:scale-95"
+          style={{ backgroundColor: accent, color: "#12161c" }}
+          aria-label="send"
+        >
+          <Send size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProfileDrawer({
   open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
   changeOwnCredentials, updateAvatar,
@@ -989,7 +1068,7 @@ function AdminApp({
   newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, chatMessages, sendChatMessage, myId,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1000,6 +1079,7 @@ function AdminApp({
     { id: "employees", label: t("navEmployees"), icon: <Users size={18} /> },
     { id: "attendance", label: t("navAttendance"), icon: <Calendar size={18} /> },
     { id: "advances", label: t("navAdvances"), icon: <Wallet size={18} /> },
+    { id: "chat", label: t("navChat"), icon: <MessageCircle size={18} /> },
     { id: "report", label: t("navReport"), icon: <ClipboardList size={18} /> },
   ];
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
@@ -1314,6 +1394,14 @@ function AdminApp({
         </div>
       )}
 
+{adminTab === "chat" && (
+        <ChatPanel
+          messages={chatMessages[currentUser.username] || []}
+          onSend={sendChatMessage}
+          myId={`admin:${currentUser.username}`}
+        />
+      )}
+        
       {adminTab === "report" && (
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
           <div className="p-5 pb-3 text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
@@ -1359,6 +1447,7 @@ function AdminApp({
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  employeeTab, setEmployeeTab, chatMessages, sendChatMessage,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { t } = useApp();
@@ -1366,6 +1455,36 @@ function EmployeeApp({
   const attDays = Object.entries(s.att)
     .map(([date, raw]) => [date, attEntryStatus(raw), attEntryWage(raw, s.emp, date)])
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
+
+  const bottomNav = (
+    <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-3xl shadow-lg px-2 py-1.5">
+        {[
+          { id: "dashboard", label: t("employeePanel"), icon: <UserIcon size={18} /> },
+          { id: "chat", label: t("navChat"), icon: <MessageCircle size={18} /> },
+        ].map((tab) => {
+          const active = employeeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setEmployeeTab(tab.id)}
+              className="flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10px] font-medium transition-colors"
+              style={{ color: active ? accent : "var(--text-muted)" }}
+            >
+              <span
+                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+                style={active ? { backgroundColor: accent + "26" } : undefined}
+              >
+                {tab.icon}
+              </span>
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
 
   return (
     <>
@@ -1383,67 +1502,81 @@ function EmployeeApp({
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        
       />
       <Shell
         title={t("employeePanel")}
         userName={currentUser.name}
         avatar={s.emp.avatar || null}
         onTitleClick={() => setDrawerOpen(true)}
+        bottomNav={bottomNav}
       >
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
-          <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
-          <Stat label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} />
-          <Stat label={t("statRemainingSalary")} value={fmt(s.remaining)} tone="good" icon={<Wallet size={12} />} />
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-6">
-          <Stat label={t("typeAvans")} value={fmt(s.totalAvans)} tone="bad" icon={<TrendingDown size={12} />} />
-          <Stat label={t("typeSalary")} value={fmt(s.totalSalaryPaid)} tone="bad" icon={<Wallet size={12} />} />
-        </div>
+        {employeeTab === "dashboard" && (
+          <>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
+              <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
+              <Stat label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} />
+              <Stat label={t("statRemainingSalary")} value={fmt(s.remaining)} tone="good" icon={<Wallet size={12} />} />
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-6">
+              <Stat label={t("typeAvans")} value={fmt(s.totalAvans)} tone="bad" icon={<TrendingDown size={12} />} />
+              <Stat label={t("typeSalary")} value={fmt(s.totalSalaryPaid)} tone="bad" icon={<Wallet size={12} />} />
+            </div>
 
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-5 shadow-sm">
-          <div className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center justify-between">
-            <span>{t("myWorkedDays")}</span>
-            <span className="text-[var(--text-muted)] text-xs font-normal">{s.emp.dailyWage ? fmt(s.emp.dailyWage) + t("perDay") : ""}</span>
-          </div>
-          {attDays.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAttendanceYet")}</p>}
-          <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-            {attDays.map(([date, v, wage]) => (
-              <div key={date} className="flex items-center justify-between text-sm py-1">
-                <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
-                  {v === 0 ? (
-                    <XCircle size={13} className="text-[var(--bad)]" />
-                  ) : (
-                    <CheckCircle2 size={13} className={v === 1 ? "text-[var(--good)]" : "text-[var(--warn)]"} />
-                  )}
-                  {date} {v === 0.5 && <span className="text-[10px] text-[var(--warn)]">({t("halfDay")})</span>}
-                  {v === 0 && <span className="text-[10px] text-[var(--bad)]">({t("absent")})</span>}
-                </span>
-                <span className={`font-mono tabular-nums ${v === 0 ? "text-[var(--bad)] text-xs" : "text-[var(--text-muted)] text-xs"}`}>{fmt(v * wage)}</span>
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-5 shadow-sm">
+              <div className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center justify-between">
+                <span>{t("myWorkedDays")}</span>
+                <span className="text-[var(--text-muted)] text-xs font-normal">{s.emp.dailyWage ? fmt(s.emp.dailyWage) + t("perDay") : ""}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              {attDays.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAttendanceYet")}</p>}
+              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                {attDays.map(([date, v, wage]) => (
+                  <div key={date} className="flex items-center justify-between text-sm py-1">
+                    <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
+                      {v === 0 ? (
+                        <XCircle size={13} className="text-[var(--bad)]" />
+                      ) : (
+                        <CheckCircle2 size={13} className={v === 1 ? "text-[var(--good)]" : "text-[var(--warn)]"} />
+                      )}
+                      {date} {v === 0.5 && <span className="text-[10px] text-[var(--warn)]">({t("halfDay")})</span>}
+                      {v === 0 && <span className="text-[10px] text-[var(--bad)]">({t("absent")})</span>}
+                    </span>
+                    <span className={`font-mono tabular-nums ${v === 0 ? "text-[var(--bad)] text-xs" : "text-[var(--text-muted)] text-xs"}`}>{fmt(v * wage)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
-          <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("myAdvances")}</div>
-          {s.advList.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>}
-          <div className="space-y-2">
-            {s.advList.slice().reverse().map((a) => (
-              <div key={a.id} className="flex items-center justify-between text-sm py-1">
-                <span className="text-[var(--text-primary)] flex items-center gap-2">
-                  <span className="font-mono tabular-nums">{fmt(a.amount)}</span>
-                  <span
-                    className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded"
-                    style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-                  >
-                    {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
-                  </span>
-                </span>
-                <span className="text-[var(--text-muted)] text-xs">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+              <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("myAdvances")}</div>
+              {s.advList.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>}
+              <div className="space-y-2">
+                {s.advList.slice().reverse().map((a) => (
+                  <div key={a.id} className="flex items-center justify-between text-sm py-1">
+                    <span className="text-[var(--text-primary)] flex items-center gap-2">
+                      <span className="font-mono tabular-nums">{fmt(a.amount)}</span>
+                      <span
+                        className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded"
+                        style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                      >
+                        {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+                      </span>
+                    </span>
+                    <span className="text-[var(--text-muted)] text-xs">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
+
+        {employeeTab === "chat" && (
+          <ChatPanel
+            messages={chatMessages[currentUser.owner] || []}
+            onSend={sendChatMessage}
+            myId={currentUser.id}
+          />
+        )}
       </Shell>
     </>
   );
@@ -1479,6 +1612,8 @@ export default function WorkforceApp() {
   const [attDate, setAttDate] = useState(todayISO());
   const [advEmp, setAdvEmp] = useState("");
   const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "", type: "avans" });
+  const [chatMessages, setChatMessages] = useState({}); // { [ownerUsername]: [ {id, senderId, senderName, senderRole, text, ts} ] }
+  const [employeeTab, setEmployeeTab] = useState("dashboard");
   const [accent, setAccent] = useState(ACCENT_PRESETS[0].value);
  const [mode, setMode] = useState(() => {
     try {
@@ -1509,6 +1644,10 @@ export default function WorkforceApp() {
             if (row.key === "users-data") setUsersData(JSON.parse(row.value));
             else if (row.key === "attendance-data") setAttendance(JSON.parse(row.value));
             else if (row.key === "advances-data") setAdvances(JSON.parse(row.value));
+            else if (row.key.startsWith("chat-")) {
+              const owner = row.key.slice(5);
+              setChatMessages((prev) => ({ ...prev, [owner]: JSON.parse(row.value) }));
+            }
           } catch (e) {
           }
         }
@@ -1536,6 +1675,19 @@ export default function WorkforceApp() {
     };
   }, [fontScale]);
 
+  useEffect(() => {
+    const owner = chatOwnerFor(currentUser);
+    if (!owner) return;
+    (async () => {
+      try {
+        const raw = await safeGet(`chat-${owner}`);
+        setChatMessages((prev) => ({ ...prev, [owner]: raw ? JSON.parse(raw) : [] }));
+      } catch (e) {
+        setChatMessages((prev) => ({ ...prev, [owner]: [] }));
+      }
+    })();
+  }, [currentUser]);
+  
   async function init() {
     let usersVal = null;
     try {
@@ -1667,6 +1819,11 @@ export default function WorkforceApp() {
     return { emp, workedDays, totalWage, totalAdvance, totalAvans, totalSalaryPaid, remaining: totalWage - totalAdvance, advList, att };
   }
 
+  function chatOwnerFor(user) {
+    if (!user) return null;
+    return user.role === "admin" ? user.username : user.owner;
+  }
+
   async function addEmployee() {
     setEmpError("");
     if (!newEmp.name || !newEmp.username || !newEmp.password || !newEmp.dailyWage) {
@@ -1740,6 +1897,25 @@ export default function WorkforceApp() {
     await persistAdvances({ ...advances, [empId]: list });
   }
 
+  async function sendChatMessage(text) {
+    if (!currentUser || !text.trim()) return;
+    const owner = chatOwnerFor(currentUser);
+    if (!owner) return;
+    const senderId = currentUser.role === "admin" ? `admin:${currentUser.username}` : currentUser.id;
+    const senderName = currentUser.role === "admin" ? currentUser.username : currentUser.name;
+    const list = [...(chatMessages[owner] || [])];
+    list.push({
+      id: "m" + Date.now() + Math.random().toString(36).slice(2, 7),
+      senderId,
+      senderName,
+      senderRole: currentUser.role,
+      text: text.trim(),
+      ts: Date.now(),
+    });
+    setChatMessages((prev) => ({ ...prev, [owner]: list }));
+    await safeSet(`chat-${owner}`, JSON.stringify(list));
+  }
+  
   function changeOwnCredentials(newUsername, newPassword) {
     if (!currentUser) return { error: "—" };
     if (currentUser.role === "admin") {
@@ -1848,6 +2024,8 @@ export default function WorkforceApp() {
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        chatMessages={chatMessages}
+        sendChatMessage={sendChatMessage}
       />
     );
   } else {
@@ -1864,6 +2042,9 @@ export default function WorkforceApp() {
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        employeeTab={employeeTab} setEmployeeTab={setEmployeeTab}
+        chatMessages={chatMessages}
+        sendChatMessage={sendChatMessage}
       />
     );
   }
