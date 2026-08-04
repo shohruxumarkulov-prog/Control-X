@@ -1020,18 +1020,26 @@ function AdminApp({
  const bottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
       <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-3xl shadow-lg px-2 py-1.5">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setAdminTab(tab.id)}
-            className="flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10px] font-medium transition-colors"
-            style={{ color: adminTab === tab.id ? accent : "var(--text-muted)" }}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const active = adminTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setAdminTab(tab.id)}
+              className="flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10px] font-medium transition-colors"
+              style={{ color: active ? accent : "var(--text-muted)" }}
+            >
+              <span
+                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+                style={active ? { backgroundColor: accent + "26" } : undefined}
+              >
+                {tab.icon}
+              </span>
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
     </nav>
   );
