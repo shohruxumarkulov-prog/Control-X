@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, MessageCircle, Send
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
@@ -164,6 +164,14 @@ const STR = {
   appearance: { uz: "Ko'rinish", ru: "Внешний вид", en: "Appearance" },
   privacySecurity: { uz: "Maxfiylik va xavfsizlik", ru: "Конфиденциальность и безопасность", en: "Privacy and Security" },
   advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
+  navChat: { uz: "Chat", ru: "Чат", en: "Chat" },
+  broadcastTitle: { uz: "Umumiy e'lon", ru: "Общее объявление", en: "Announcement" },
+  broadcastSubtitle: { uz: "Barcha ishchilaringizga", ru: "Всем вашим сотрудникам", en: "To all your employees" },
+  typeMessage: { uz: "Xabar yozing...", ru: "Напишите сообщение...", en: "Type a message..." },
+  noMessagesYet: { uz: "Hali xabar yo'q", ru: "Пока нет сообщений", en: "No messages yet" },
+  chatWith: { uz: "bilan suhbat", ru: "чат с", en: "chat with" },
+  noBroadcastYet: { uz: "Hali e'lon yo'q", ru: "Пока нет объявлений", en: "No announcements yet" },
+  home: { uz: "Bosh sahifa", ru: "Главная", en: "Home" },
 };
 
 function makeT(lang) {
@@ -709,6 +717,105 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
   );
 }
 
+// ---------- CHAT ----------
+function ChatThreadList({ myEmployees, chats, adminUsername, onOpenBroadcast, onOpenEmployee }) {
+  const { accent, t } = useApp();
+  const broadcastList = chats.broadcast[adminUsername] || [];
+  const lastBroadcast = broadcastList[broadcastList.length - 1];
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={onOpenBroadcast}
+        className="w-full flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 text-left hover:border-[var(--accent)] transition-colors"
+      >
+        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: accent }}>
+          <MessageCircle size={18} className="text-[#12161c]" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[var(--text-primary)] text-sm font-medium">{t("broadcastTitle")}</div>
+          <div className="text-[var(--text-muted)] text-xs truncate">{lastBroadcast ? lastBroadcast.text : t("broadcastSubtitle")}</div>
+        </div>
+      </button>
+      {myEmployees.map((emp) => {
+        const list = chats.direct[emp.id] || [];
+        const last = list[list.length - 1];
+        return (
+          <button
+            key={emp.id}
+            type="button"
+            onClick={() => onOpenEmployee(emp.id)}
+            className="w-full flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 text-left hover:border-[var(--accent)] transition-colors"
+          >
+            <Avatar src={emp.avatar} name={emp.name} size={40} />
+            <div className="min-w-0 flex-1">
+              <div className="text-[var(--text-primary)] text-sm font-medium truncate">{emp.name}</div>
+              <div className="text-[var(--text-muted)] text-xs truncate">{last ? last.text : t("noMessagesYet")}</div>
+            </div>
+          </button>
+        );
+      })}
+      {myEmployees.length === 0 && <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>}
+    </div>
+  );
+}
+
+function MessageThread({ messages, onSend, emptyText, inputPlaceholder, alignRightWhen, heightClass = "h-[60vh]" }) {
+  const [text, setText] = useState("");
+  const bottomRef = useRef(null);
+  const { accent } = useApp();
+
+  useEffect(() => {
+    if (bottomRef.current) bottomRef.current.scrollIntoView({ block: "end" });
+  }, [messages.length]);
+
+  function submit() {
+    if (!text.trim()) return;
+    onSend(text);
+    setText("");
+  }
+
+  return (
+    <div className={`flex flex-col ${heightClass}`}>
+      <div className="flex-1 overflow-y-auto space-y-2 pb-3 pr-1">
+        {messages.length === 0 && <p className="text-[var(--text-muted)] text-sm text-center py-8">{emptyText}</p>}
+        {messages.map((m) => {
+          const mine = alignRightWhen(m);
+          return (
+            <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${mine ? "text-[#12161c]" : "bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)]"}`}
+                style={mine ? { backgroundColor: accent } : undefined}
+              >
+                {m.text}
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+      <div className="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+          placeholder={inputPlaceholder}
+          className="flex-1 px-3.5 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
+        />
+        <button
+          type="button"
+          onClick={submit}
+          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+          style={{ backgroundColor: accent }}
+          aria-label="send"
+        >
+          <Send size={16} className="text-[#12161c]" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MenuRow({ icon, label, onClick, danger }) {
   return (
     <button
@@ -985,10 +1092,12 @@ function AdminApp({
   newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
+  chats, sendDirectMessage, sendBroadcast,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [chatView, setChatView] = useState(null); // null | "broadcast" | employeeId
   const { t } = useApp();
   const myAdmin = usersData.admins[currentUser.username] || { password: "", avatar: null };
   const myEmployees = usersData.employees.filter((e) => e.owner === currentUser.username);
@@ -996,6 +1105,7 @@ function AdminApp({
     { id: "employees", label: t("navEmployees"), icon: <Users size={18} /> },
     { id: "attendance", label: t("navAttendance"), icon: <Calendar size={18} /> },
     { id: "advances", label: t("navAdvances"), icon: <Wallet size={18} /> },
+    { id: "chat", label: t("navChat"), icon: <MessageCircle size={18} /> },
     { id: "report", label: t("navReport"), icon: <ClipboardList size={18} /> },
   ];
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
@@ -1302,6 +1412,48 @@ function AdminApp({
         </div>
       )}
 
+      {adminTab === "chat" && (
+        <div>
+          {chatView === null && (
+            <ChatThreadList
+              myEmployees={myEmployees}
+              chats={chats}
+              adminUsername={currentUser.username}
+              onOpenBroadcast={() => setChatView("broadcast")}
+              onOpenEmployee={(id) => setChatView(id)}
+            />
+          )}
+          {chatView === "broadcast" && (
+            <div>
+              <button type="button" onClick={() => setChatView(null)} className="flex items-center gap-1.5 text-[var(--text-secondary)] text-sm mb-3 hover:text-[var(--text-primary)] transition-colors">
+                <ArrowLeft size={16} /> {t("broadcastTitle")}
+              </button>
+              <MessageThread
+                messages={chats.broadcast[currentUser.username] || []}
+                onSend={(text) => sendBroadcast(currentUser.username, text)}
+                emptyText={t("noBroadcastYet")}
+                inputPlaceholder={t("typeMessage")}
+                alignRightWhen={() => true}
+              />
+            </div>
+          )}
+          {chatView !== null && chatView !== "broadcast" && (
+            <div>
+              <button type="button" onClick={() => setChatView(null)} className="flex items-center gap-1.5 text-[var(--text-secondary)] text-sm mb-3 hover:text-[var(--text-primary)] transition-colors">
+                <ArrowLeft size={16} /> {myEmployees.find((e) => e.id === chatView)?.name}
+              </button>
+              <MessageThread
+                messages={chats.direct[chatView] || []}
+                onSend={(text) => sendDirectMessage(chatView, "admin", text)}
+                emptyText={t("noMessagesYet")}
+                inputPlaceholder={t("typeMessage")}
+                alignRightWhen={(m) => m.from === "admin"}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {adminTab === "report" && (
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
           <div className="p-5 pb-3 text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
@@ -1346,14 +1498,41 @@ function AdminApp({
 
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
+  chats, sendDirectMessage,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [empTab, setEmpTab] = useState("home"); // "home" | "chat"
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
     .map(([date, raw]) => [date, attEntryStatus(raw), attEntryWage(raw, s.emp, date)])
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
+
+  const bottomNav = (
+    <nav className="fixed bottom-0 left-0 right-0 bg-[var(--bg-card)]/90 backdrop-blur-md border-t border-[var(--border)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="max-w-4xl mx-auto flex">
+        <button
+          type="button"
+          onClick={() => setEmpTab("home")}
+          className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors"
+          style={{ color: empTab === "home" ? accent : "var(--text-muted)" }}
+        >
+          <ShieldCheck size={18} />
+          {t("home")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEmpTab("chat")}
+          className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors"
+          style={{ color: empTab === "chat" ? accent : "var(--text-muted)" }}
+        >
+          <MessageCircle size={18} />
+          {t("navChat")}
+        </button>
+      </div>
+    </nav>
+  );
 
   return (
     <>
@@ -1377,7 +1556,10 @@ function EmployeeApp({
         userName={currentUser.name}
         avatar={s.emp.avatar || null}
         onTitleClick={() => setDrawerOpen(true)}
+        bottomNav={bottomNav}
       >
+      {empTab === "home" && (
+        <>
         <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
           <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
           <Stat label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} />
@@ -1432,6 +1614,38 @@ function EmployeeApp({
             ))}
           </div>
         </div>
+        </>
+      )}
+
+      {empTab === "chat" && (
+        <div className="space-y-4">
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+            <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold mb-3">
+              <MessageCircle size={15} /> {t("broadcastTitle")}
+            </div>
+            {(chats.broadcast[currentUser.owner] || []).length === 0 && (
+              <p className="text-[var(--text-muted)] text-xs">{t("noBroadcastYet")}</p>
+            )}
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+              {(chats.broadcast[currentUser.owner] || []).slice().reverse().map((m) => (
+                <div key={m.id} className="text-sm text-[var(--text-primary)] bg-[var(--bg-app)] rounded-lg px-3 py-2 border border-[var(--border-input)]">
+                  {m.text}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+            <MessageThread
+              messages={chats.direct[currentUser.id] || []}
+              onSend={(text) => sendDirectMessage(currentUser.id, "employee", text)}
+              emptyText={t("noMessagesYet")}
+              inputPlaceholder={t("typeMessage")}
+              alignRightWhen={(m) => m.from === "employee"}
+              heightClass="h-[50vh]"
+            />
+          </div>
+        </div>
+      )}
       </Shell>
     </>
   );
@@ -1442,6 +1656,7 @@ export default function WorkforceApp() {
   const [usersData, setUsersData] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [advances, setAdvances] = useState({});
+  const [chats, setChats] = useState({ direct: {}, broadcast: {} });
   const [currentUser, setCurrentUserState] = useState(() => {
     try {
       const raw = localStorage.getItem("current-user");
@@ -1468,7 +1683,7 @@ export default function WorkforceApp() {
   const [advEmp, setAdvEmp] = useState("");
   const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "", type: "avans" });
   const [accent, setAccent] = useState(ACCENT_PRESETS[0].value);
- const [mode, setMode] = useState(() => {
+  const [mode, setMode] = useState(() => {
     try {
       return localStorage.getItem("app-mode") || "dark";
     } catch (e) {
@@ -1497,6 +1712,7 @@ export default function WorkforceApp() {
             if (row.key === "users-data") setUsersData(JSON.parse(row.value));
             else if (row.key === "attendance-data") setAttendance(JSON.parse(row.value));
             else if (row.key === "advances-data") setAdvances(JSON.parse(row.value));
+            else if (row.key === "chats-data") setChats(JSON.parse(row.value));
           } catch (e) {
           }
         }
@@ -1574,6 +1790,13 @@ export default function WorkforceApp() {
       setAdvances({});
     }
 
+    try {
+      const rawChats = await safeGet("chats-data");
+      setChats(rawChats ? JSON.parse(rawChats) : { direct: {}, broadcast: {} });
+    } catch (e) {
+      setChats({ direct: {}, broadcast: {} });
+    }
+
     setLoading(false);
   }
 
@@ -1588,6 +1811,26 @@ export default function WorkforceApp() {
   async function persistAdvances(data) {
     setAdvances(data);
     await safeSet("advances-data", JSON.stringify(data));
+  }
+  async function persistChats(data) {
+    setChats(data);
+    await safeSet("chats-data", JSON.stringify(data));
+  }
+
+  // Direct message between an admin and one of their employees.
+  async function sendDirectMessage(employeeId, from, text) {
+    if (!text || !text.trim()) return;
+    const list = chats.direct[employeeId] ? [...chats.direct[employeeId]] : [];
+    list.push({ id: "m" + Date.now(), from, text: text.trim(), ts: Date.now() });
+    await persistChats({ ...chats, direct: { ...chats.direct, [employeeId]: list } });
+  }
+
+  // Admin's announcement, visible to every employee that admin owns.
+  async function sendBroadcast(adminUsername, text) {
+    if (!text || !text.trim()) return;
+    const list = chats.broadcast[adminUsername] ? [...chats.broadcast[adminUsername]] : [];
+    list.push({ id: "b" + Date.now(), text: text.trim(), ts: Date.now() });
+    await persistChats({ ...chats, broadcast: { ...chats.broadcast, [adminUsername]: list } });
   }
 
   function handleLogin(asAdmin) {
