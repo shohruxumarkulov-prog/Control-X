@@ -1068,6 +1068,7 @@ function AdminApp({
         onTitleClick={() => setDrawerOpen(true)}
         bottomNav={bottomNav}
       >
+      <div key={adminTab} className="tab-transition">
       {adminTab === "employees" && (
         <div className="space-y-5">
           {!showAddForm ? (
@@ -1351,6 +1352,7 @@ function AdminApp({
           </div>
         </div>
       )}
+      </div>
       </Shell>
     </>
   );
