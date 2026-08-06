@@ -1887,6 +1887,11 @@ export default function WorkforceApp() {
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Manrope:ital@0;1&subset=cyrillic&display=swap');
           .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+          @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .tab-transition { animation: fadeSlideIn 0.28s ease-out; }
         `}</style>
         {screen}
       </div>
