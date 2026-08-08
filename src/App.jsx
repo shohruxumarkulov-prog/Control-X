@@ -1004,6 +1004,23 @@ function AdminApp({
     { id: "report", label: t("navReport"), icon: <ClipboardList size={18} /> },
   ];
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
+  function exportReportToExcel() {
+    const rows = myEmployees.map((emp) => {
+      const s = summaryFor(emp.id);
+      return {
+        [t("colEmployee")]: emp.name,
+        [t("colDays")]: fmtDays(s.workedDays),
+        [t("colCalculated")]: s.totalWage,
+        [t("colAdvance")]: s.totalAdvance,
+        [t("colRemaining")]: s.remaining,
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, t("reportHeader").slice(0, 31));
+    XLSX.writeFile(wb, `hisobot-${todayISO()}.xlsx`);
+  }
   const [weekOffset, setWeekOffset] = useState(0);
   const dateStrip = (() => {
     const today = new Date();
@@ -1318,8 +1335,20 @@ function AdminApp({
 
       {adminTab === "report" && (
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
-          <div className="p-5 pb-3 text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
-            <ClipboardList size={15} /> {t("reportHeader")}
+          <div className="p-5 pb-3 flex items-center justify-between gap-2">
+            <div className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
+              <ClipboardList size={15} /> {t("reportHeader")}
+            </div>
+            {myEmployees.length > 0 && (
+              <button
+                type="button"
+                onClick={exportReportToExcel}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
+                style={{ backgroundColor: accent }}
+              >
+                <Download size={13} /> Excel
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
