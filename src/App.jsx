@@ -7,6 +7,7 @@ import {
   Menu, ChevronUp, UserX, ArrowLeft, Paintbrush
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import * as XLSX from "xlsx";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(n || 0).toLocaleString("uz-UZ") + " so'm";
