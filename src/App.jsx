@@ -113,6 +113,9 @@ const STR = {
   myWorkedDays: { uz: "Ishlagan kunlarim", ru: "Мои отработанные дни", en: "My worked days" },
   noAttendanceYet: { uz: "Hali davomat belgilanmagan", ru: "Посещаемость ещё не отмечена", en: "No attendance marked yet" },
   futureDateWarning: { uz: "Hali kelmagan sanaga davomat belgilab bo'lmaydi", ru: "Нельзя отметить посещаемость на будущую дату", en: "You can't mark attendance for a future date" },
+  markAllFull: { uz: "Hammasi to'liq", ru: "Все полный день", en: "Mark all full" },
+  markAllHalf: { uz: "Hammasi yarim", ru: "Все полдня", en: "Mark all half" },
+  markAllAbsent: { uz: "Hammasi kelmadi", ru: "Все отсутствуют", en: "Mark all absent" },
   myAdvances: { uz: "Avanslarim", ru: "Мои авансы", en: "My advances" },
   noAdvancesYet: { uz: "Hali avans olmagansiz", ru: "Вы ещё не получали аванс", en: "You haven't taken an advance yet" },
   statWorkedDays: { uz: "Ishlagan kunlar", ru: "Отработано дней", en: "Days worked" },
@@ -988,7 +991,7 @@ function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
   newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
-  attendance, attDate, setAttDate, markAttendance,
+  attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
@@ -1205,6 +1208,32 @@ function AdminApp({
             </div>
           </div>
 
+          {myEmployees.length > 0 && attDate <= todayISO() && (
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => bulkMarkAttendance(myEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 1)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--good-soft)] text-[var(--good)] hover:opacity-80 transition-opacity"
+              >
+                <CheckCircle2 size={13} /> {t("markAllFull")}
+              </button>
+              <button
+                type="button"
+                onClick={() => bulkMarkAttendance(myEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 0.5)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--warn-soft)] text-[var(--warn)] hover:opacity-80 transition-opacity"
+              >
+                <Calendar size={13} /> {t("markAllHalf")}
+              </button>
+              <button
+                type="button"
+                onClick={() => bulkMarkAttendance(myEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 0)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--bad-soft)] text-[var(--bad)] hover:opacity-80 transition-opacity"
+              >
+                <XCircle size={13} /> {t("markAllAbsent")}
+              </button>
+            </div>
+          )}
+          
           <div className="space-y-2">
             {myEmployees.length === 0 && (
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
@@ -1759,6 +1788,17 @@ export default function WorkforceApp() {
     await persistAttendance({ ...attendance, [empId]: dayMap });
   }
 
+  async function bulkMarkAttendance(empList, status) {
+    if (attDate > todayISO()) return;
+    const updated = { ...attendance };
+    empList.forEach(({ id, wage }) => {
+      const dayMap = { ...(updated[id] || {}) };
+      dayMap[attDate] = { v: status, wage: Number(wage || 0) };
+      updated[id] = dayMap;
+    });
+    await persistAttendance(updated);
+  }
+
   async function addAdvance() {
     if (!advEmp || !advForm.amount) return;
     const list = advances[advEmp] ? [...advances[advEmp]] : [];
@@ -1866,6 +1906,7 @@ export default function WorkforceApp() {
         attDate={attDate}
         setAttDate={setAttDate}
         markAttendance={markAttendance}
+        bulkMarkAttendance={bulkMarkAttendance}
         advances={advances}
         advEmp={advEmp}
         setAdvEmp={setAdvEmp}
