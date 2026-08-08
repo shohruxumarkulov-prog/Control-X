@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush,  Download
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
