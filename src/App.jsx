@@ -167,6 +167,7 @@ const STR = {
   yesDeleteAccount: { uz: "Ha, akkauntni o'chirish", ru: "Да, удалить аккаунт", en: "Yes, delete account" },
   appearance: { uz: "Ko'rinish", ru: "Внешний вид", en: "Appearance" },
   privacySecurity: { uz: "Maxfiylik va xavfsizlik", ru: "Конфиденциальность и безопасность", en: "Privacy and Security" },
+  updateCredentials: { uz: "Login va parolni yangilash", ru: "Обновить логин и пароль", en: "Update login and password" },
   advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
 };
 
@@ -746,7 +747,8 @@ function ProfileDrawer({
     if (!open) setPage(null);
   }, [open]);
 
-  const PAGE_TITLES = { appearance: t("appearance"), privacy: t("privacySecurity"), language: t("language"), advanced: t("advanced") };
+  const PAGE_TITLES = { appearance: t("appearance"), privacy: t("privacySecurity"), credentials: t("updateCredentials"), language: t("language"), advanced: t("advanced") };
+  const PARENT_PAGE = { credentials: "privacy" };
 
   async function handleFile(e) {
     const file = e.target.files && e.target.files[0];
@@ -804,7 +806,7 @@ function ProfileDrawer({
           {page ? (
             <button
               type="button"
-              onClick={() => setPage(null)}
+              onClick={() => setPage(PARENT_PAGE[page] || null)}
               className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold"
             >
               <ArrowLeft size={18} /> {PAGE_TITLES[page]}
@@ -903,6 +905,12 @@ function ProfileDrawer({
         )}
 
         {page === "privacy" && (
+          <div className="px-5">
+            <MenuRow icon={<KeyRound size={18} className="text-[var(--accent)]" />} label={t("updateCredentials")} onClick={() => setPage("credentials")} />
+          </div>
+        )}
+
+        {page === "credentials" && (
           <div className="px-5 pt-5 pb-8">
             <div className="space-y-3">
               <Field label={t("currentPassword")} type="password" value={currentPw} onChange={setCurrentPw} />
