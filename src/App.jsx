@@ -225,6 +225,16 @@ const PALETTES = {
 };
 
 const ADMIN_DEFAULT = { username: "admin", password: "admin123" };
+const VAPID_PUBLIC_KEY = "BJHw7YqggwDUKfjS9pOcZyA_y7MO_46FWaRKv-fF8zr71CDEycK7hlEzq_hq4IzW7VhzysMJFZ-jXP4ULEYzn3k";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
 
 const memoryStore = {};
 
@@ -1861,6 +1871,33 @@ export default function WorkforceApp() {
       const adv2 = { ...advances }; delete adv2[currentUser.id]; await persistAdvances(adv2);
     }
     logout();
+  }
+
+  async function enableNotifications() {
+    if (!currentUser || currentUser.role !== "admin") return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      alert("Bu qurilma/brauzer bildirishnomani qo'llab-quvvatlamaydi");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+      await supabase.from("push_subscriptions").insert({
+        admin_username: currentUser.username,
+        subscription: sub.toJSON(),
+      });
+      alert("Bildirishnoma yoqildi!");
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async function updateAvatar(dataUrl) {
