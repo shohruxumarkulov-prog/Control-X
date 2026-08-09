@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush,  Download
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
@@ -168,6 +168,7 @@ const STR = {
   appearance: { uz: "Ko'rinish", ru: "Внешний вид", en: "Appearance" },
   privacySecurity: { uz: "Maxfiylik va xavfsizlik", ru: "Конфиденциальность и безопасность", en: "Privacy and Security" },
   updateCredentials: { uz: "Login va parolni yangilash", ru: "Обновить логин и пароль", en: "Update login and password" },
+  enableNotifications: { uz: "Bildirishnomalarni yoqish", ru: "Включить уведомления", en: "Enable notifications" },
   advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
 };
 
@@ -739,7 +740,7 @@ function MenuRow({ icon, label, onClick, danger }) {
 
 function ProfileDrawer({
   open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
-  changeOwnCredentials, updateAvatar,
+  changeOwnCredentials, updateAvatar, enableNotifications,
   accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const { t } = useApp();
@@ -917,6 +918,9 @@ function ProfileDrawer({
         {page === "privacy" && (
           <div className="px-5">
             <MenuRow icon={<KeyRound size={18} className="text-[var(--accent)]" />} label={t("updateCredentials")} onClick={() => setPage("credentials")} />
+            {isAdmin && (
+              <MenuRow icon={<Send size={18} className="text-[var(--good)]" />} label={t("enableNotifications")} onClick={enableNotifications} />
+            )}
           </div>
         )}
 
@@ -1011,7 +1015,7 @@ function AdminApp({
   newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1099,6 +1103,7 @@ function AdminApp({
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        enableNotifications={enableNotifications}
       />
       <Shell
         title={t("adminPanel")}
@@ -1966,6 +1971,7 @@ export default function WorkforceApp() {
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        enableNotifications={enableNotifications}
       />
     );
   } else {
