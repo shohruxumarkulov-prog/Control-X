@@ -169,6 +169,9 @@ const STR = {
   privacySecurity: { uz: "Maxfiylik va xavfsizlik", ru: "Конфиденциальность и безопасность", en: "Privacy and Security" },
   updateCredentials: { uz: "Login va parolni yangilash", ru: "Обновить логин и пароль", en: "Update login and password" },
   enableNotifications: { uz: "Bildirishnomalarni yoqish", ru: "Включить уведомления", en: "Enable notifications" },
+  notifications: { uz: "Bildirishnomalar", ru: "Уведомления", en: "Notifications" },
+  noNotifications: { uz: "Hali bildirishnoma yo'q", ru: "Уведомлений пока нет", en: "No notifications yet" },
+  markAllRead: { uz: "Hammasini o'qilgan deb belgilash", ru: "Отметить все как прочитанные", en: "Mark all as read" },
   advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
 };
 
@@ -1563,6 +1566,7 @@ export default function WorkforceApp() {
   const [attDate, setAttDate] = useState(todayISO());
   const [advEmp, setAdvEmp] = useState("");
   const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "", type: "avans" });
+  const [notifications, setNotifications] = useState([]);
   const [accent, setAccent] = useState(ACCENT_PRESETS[0].value);
  const [mode, setMode] = useState(() => {
     try {
@@ -1619,6 +1623,26 @@ export default function WorkforceApp() {
       }
     };
   }, [fontScale]);
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== "admin") return;
+    loadNotifications(currentUser.username);
+
+    const channel = supabase
+      .channel(`notif_${currentUser.username}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `admin_username=eq.${currentUser.username}` },
+        (payload) => {
+          setNotifications((prev) => [payload.new, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
 
   async function init() {
     let usersVal = null;
@@ -1878,6 +1902,23 @@ export default function WorkforceApp() {
     logout();
   }
 
+  async function loadNotifications(adminUsername) {
+    if (!adminUsername) return;
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("admin_username", adminUsername)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    setNotifications(data || []);
+  }
+
+  async function markAllNotificationsRead(adminUsername) {
+    if (!adminUsername) return;
+    await supabase.from("notifications").update({ is_read: true }).eq("admin_username", adminUsername).eq("is_read", false);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  }
+
   async function enableNotifications() {
     if (!currentUser || currentUser.role !== "admin") return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -1972,6 +2013,8 @@ export default function WorkforceApp() {
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
         enableNotifications={enableNotifications}
+        notifications={notifications}
+        markAllNotificationsRead={markAllNotificationsRead}
       />
     );
   } else {
