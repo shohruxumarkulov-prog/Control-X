@@ -1136,16 +1136,15 @@ function AdminApp({
               key={tab.id}
               type="button"
               onClick={() => setAdminTab(tab.id)}
-              className="flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10px] font-medium transition-colors"
-              style={{ color: active ? accent : "var(--text-muted)" }}
+              className="flex-1 flex justify-center py-1"
             >
               <span
-                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
-                style={active ? { backgroundColor: accent + "26" } : undefined}
+                className="flex flex-col items-center gap-0.5 px-3.5 py-1.5 rounded-2xl text-[10px] font-medium transition-colors"
+                style={active ? { backgroundColor: accent + "26", color: accent } : { color: "var(--text-muted)" }}
               >
                 {tab.icon}
+                {tab.label}
               </span>
-              {tab.label}
             </button>
           );
         })}
