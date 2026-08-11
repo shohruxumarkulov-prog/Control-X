@@ -1136,10 +1136,10 @@ function AdminApp({
               key={tab.id}
               type="button"
               onClick={() => setAdminTab(tab.id)}
-              className="flex-1 flex justify-center py-1"
+              className="flex-1 flex justify-center"
             >
               <span
-                className="flex flex-col items-center gap-0.5 px-3.5 py-1.5 rounded-full text-[10px] font-medium transition-colors"
+                className="w-full flex flex-col items-center gap-0.5 px-4 py-2.5 rounded-full text-[10px] font-medium transition-colors"
                 style={active ? { backgroundColor: accent + "26", color: accent } : { color: "var(--text-muted)" }}
               >
                 {tab.icon}
