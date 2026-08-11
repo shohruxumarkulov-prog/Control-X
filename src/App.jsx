@@ -1095,17 +1095,23 @@ function AdminApp({
     { id: "report", label: t("navReport"), icon: <ClipboardList size={18} /> },
   ];
   const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
   function handleTouchStart(e) {
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   }
   function handleTouchEnd(e) {
     if (touchStartX.current === null) return;
     const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
     touchStartX.current = null;
-    if (Math.abs(deltaX) < 60) return;
+    touchStartY.current = null;
+    if (Math.abs(deltaX) < 110) return;
+    if (Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
     const idx = tabs.findIndex((t) => t.id === adminTab);
     if (deltaX < 0 && idx < tabs.length - 1) setAdminTab(tabs[idx + 1].id);
     if (deltaX > 0 && idx > 0) setAdminTab(tabs[idx - 1].id);
+  }
   }
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
   function exportReportToExcel() {
