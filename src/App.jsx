@@ -183,7 +183,7 @@ function makeT(lang) {
   };
 }
 
-const AppContext = createContext({ accent: "#c98a4b", lang: "uz", t: makeT("uz") });
+const AppContext = createContext({ accent: "#4d84d9", lang: "uz", t: makeT("uz") });
 const useApp = () => useContext(AppContext);
 
 const ACCENT_PRESETS = [
@@ -1650,7 +1650,7 @@ export default function WorkforceApp() {
   const [advEmp, setAdvEmp] = useState("");
   const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "", type: "avans" });
   const [notifications, setNotifications] = useState([]);
-  const [accent, setAccent] = useState(ACCENT_PRESETS[0].value);
+  const [accent, setAccent] = useState(ACCENT_PRESETS[2].value);
  const [mode, setMode] = useState(() => {
     try {
       return localStorage.getItem("app-mode") || "dark";
