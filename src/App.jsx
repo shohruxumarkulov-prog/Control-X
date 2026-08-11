@@ -1094,6 +1094,19 @@ function AdminApp({
     { id: "advances", label: t("navAdvances"), icon: <Wallet size={18} /> },
     { id: "report", label: t("navReport"), icon: <ClipboardList size={18} /> },
   ];
+  const touchStartX = useRef(null);
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchEnd(e) {
+    if (touchStartX.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(deltaX) < 60) return;
+    const idx = tabs.findIndex((t) => t.id === adminTab);
+    if (deltaX < 0 && idx < tabs.length - 1) setAdminTab(tabs[idx + 1].id);
+    if (deltaX > 0 && idx > 0) setAdminTab(tabs[idx - 1].id);
+  }
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
   function exportReportToExcel() {
     const rows = myEmployees.map((emp) => {
@@ -1126,6 +1139,7 @@ function AdminApp({
     });
   })();
 
+  
  const bottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
       <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
@@ -1198,7 +1212,7 @@ function AdminApp({
           </button>
         }
       >
-      <div key={adminTab} className="tab-transition">
+      <div key={adminTab} className="tab-transition" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {adminTab === "employees" && (
         <div className="space-y-5">
           {!showAddForm ? (
