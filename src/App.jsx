@@ -1112,7 +1112,7 @@ function AdminApp({
     if (deltaX < 0 && idx < tabs.length - 1) setAdminTab(tabs[idx + 1].id);
     if (deltaX > 0 && idx > 0) setAdminTab(tabs[idx - 1].id);
   }
-  }
+  
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
   function exportReportToExcel() {
     const rows = myEmployees.map((emp) => {
