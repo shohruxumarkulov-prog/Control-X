@@ -1128,7 +1128,7 @@ function AdminApp({
 
  const bottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
-      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-2 py-1.5">
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
         {tabs.map((tab) => {
           const active = adminTab === tab.id;
           return (
