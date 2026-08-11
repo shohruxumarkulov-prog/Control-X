@@ -369,7 +369,7 @@ function Avatar({ src, name, size = 40 }) {
   );
 }
 
-function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
+function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, children }) {
   const { accent } = useApp();
   return (
     <div className="min-h-screen bg-[var(--bg-app)] flex flex-col">
@@ -390,6 +390,7 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, children }) {
             <div className="text-[var(--text-muted)] text-xs leading-tight">{userName}</div>
           </div>
         </button>
+        {headerRight}
       </header>
       <main className={`flex-1 p-5 max-w-4xl w-full mx-auto ${bottomNav ? "pb-32" : ""}`}>{children}</main>
       {bottomNav}
@@ -741,6 +742,65 @@ function MenuRow({ icon, label, onClick, danger }) {
   );
 }
 
+function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
+  const { t } = useApp();
+  return (
+    <>
+      {open && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
+      )}
+      <div
+        className={`fixed top-0 right-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] border-l border-[var(--border)] shadow-2xl z-40 overflow-y-auto transition-transform duration-200 ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--bg-panel)] z-10">
+          <span className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
+            <Bell size={16} /> {t("notifications")}
+          </span>
+          <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {notifications.length > 0 && (
+          <div className="px-5 pt-3">
+            <button
+              type="button"
+              onClick={onMarkAllRead}
+              className="text-[var(--accent)] text-xs font-medium hover:opacity-80 transition-opacity"
+            >
+              {t("markAllRead")}
+            </button>
+          </div>
+        )}
+
+        <div className="px-5 py-4 space-y-2.5">
+          {notifications.length === 0 && (
+            <p className="text-[var(--text-muted)] text-sm text-center py-10">{t("noNotifications")}</p>
+          )}
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5"
+              style={!n.is_read ? { borderColor: "var(--accent)" } : undefined}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-[var(--text-primary)] text-sm font-semibold">{n.title}</span>
+                {!n.is_read && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: "var(--accent)" }} />}
+              </div>
+              <p className="text-[var(--text-secondary)] text-xs leading-snug">{n.body}</p>
+              <p className="text-[var(--text-faint)] text-[10px] mt-1.5">
+                {new Date(n.created_at).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function ProfileDrawer({
   open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
   changeOwnCredentials, updateAvatar, enableNotifications,
@@ -1019,9 +1079,12 @@ function AdminApp({
   attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
+  notifications, markAllNotificationsRead,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
   const { t } = useApp();
   const myAdmin = usersData.admins[currentUser.username] || { password: "", avatar: null };
   const myEmployees = usersData.employees.filter((e) => e.owner === currentUser.username);
@@ -1108,12 +1171,33 @@ function AdminApp({
         lang={lang} setLang={setLang}
         enableNotifications={enableNotifications}
       />
+      <NotificationPanel
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        notifications={notifications}
+        onMarkAllRead={() => markAllNotificationsRead(currentUser.username)}
+      />
       <Shell
         title={t("adminPanel")}
         userName={currentUser.username}
         avatar={myAdmin.avatar || null}
         onTitleClick={() => setDrawerOpen(true)}
         bottomNav={bottomNav}
+        headerRight={
+          <button
+            type="button"
+            onClick={() => setNotifOpen(true)}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition-colors shrink-0 relative"
+            aria-label={t("notifications")}
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--bad)] text-white text-[9px] font-bold flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        }
       >
       <div key={adminTab} className="tab-transition">
       {adminTab === "employees" && (
