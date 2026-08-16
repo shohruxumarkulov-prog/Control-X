@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
+import confetti from "canvas-confetti";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(n || 0).toLocaleString("uz-UZ") + " so'm";
@@ -1901,6 +1902,11 @@ export default function WorkforceApp() {
     };
     await persistUsers(updated);
     setNewEmp({ name: "", username: "", password: "", dailyWage: "" });
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
   }
 
   async function deleteEmployee(id) {
