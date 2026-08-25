@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell
+    Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, LayoutDashboard
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
@@ -179,6 +179,14 @@ const STR = {
   noNotifications: { uz: "Hali bildirishnoma yo'q", ru: "Уведомлений пока нет", en: "No notifications yet" },
   markAllRead: { uz: "Hammasini o'qilgan deb belgilash", ru: "Отметить все как прочитанные", en: "Mark all as read" },
   advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
+  navDashboard: { uz: "Bosh sahifa", ru: "Главная", en: "Dashboard" },
+  statTotalEmployees: { uz: "Jami ishchilar", ru: "Всего сотрудников", en: "Total employees" },
+  statPresentToday: { uz: "Bugun kelganlar", ru: "Пришли сегодня", en: "Present today" },
+  statMonthWage: { uz: "Shu oy hisoblangan", ru: "Начислено за месяц", en: "This month accrued" },
+  statTotalOwed: { uz: "Jami to'lanishi kerak", ru: "Всего к выплате", en: "Total owed" },
+  whoToPayTitle: { uz: "Kimga qancha to'lash kerak", ru: "Кому сколько платить", en: "Who to pay" },
+  allPaidUp: { uz: "Hammaga to'langan, qarz yo'q 🎉", ru: "Все выплачено, долгов нет 🎉", en: "Everyone is paid up 🎉" },
+  seeAll: { uz: "Hammasini ko'rish", ru: "Смотреть все", en: "See all" },
 };
 
 function makeT(lang) {
@@ -1094,7 +1102,8 @@ function AdminApp({
   const { t } = useApp();
   const myAdmin = usersData.admins[currentUser.username] || { password: "", avatar: null };
   const myEmployees = usersData.employees.filter((e) => e.owner === currentUser.username);
-  const tabs = [
+    const tabs = [
+    { id: "dashboard", label: t("navDashboard"), icon: <LayoutDashboard size={18} /> },
     { id: "employees", label: t("navEmployees"), icon: <Users size={18} /> },
     { id: "attendance", label: t("navAttendance"), icon: <Calendar size={18} /> },
     { id: "advances", label: t("navAdvances"), icon: <Wallet size={18} /> },
@@ -1137,6 +1146,28 @@ function AdminApp({
     XLSX.utils.book_append_sheet(wb, ws, t("reportHeader").slice(0, 31));
     XLSX.writeFile(wb, `hisobot-${todayISO()}.xlsx`);
   }
+    const todayStr = todayISO();
+  const presentToday = myEmployees.filter((emp) => {
+    const raw = attendance[emp.id]?.[todayStr];
+    return raw !== undefined && attEntryStatus(raw) > 0;
+  }).length;
+
+  const monthPrefix = todayStr.slice(0, 7);
+  let monthWageTotal = 0;
+  myEmployees.forEach((emp) => {
+    const att = attendance[emp.id] || {};
+    Object.entries(att).forEach(([date, raw]) => {
+      if (date.startsWith(monthPrefix)) {
+        monthWageTotal += attEntryStatus(raw) * attEntryWage(raw, emp, date);
+      }
+    });
+  });
+
+  const employeesWithOwed = myEmployees
+    .map((emp) => ({ emp, remaining: summaryFor(emp.id).remaining }))
+    .filter((x) => x.remaining > 0)
+    .sort((a, b) => b.remaining - a.remaining);
+  const totalOwed = employeesWithOwed.reduce((sum, x) => sum + x.remaining, 0);
   const [weekOffset, setWeekOffset] = useState(0);
   const dateStrip = (() => {
     const today = new Date();
@@ -1225,6 +1256,51 @@ function AdminApp({
         }
       >
       <div key={adminTab} className="tab-transition" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+              {adminTab === "dashboard" && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            <Stat label={t("statTotalEmployees")} value={myEmployees.length} icon={<Users size={12} />} />
+            <Stat label={t("statPresentToday")} value={`${presentToday}/${myEmployees.length}`} icon={<CheckCircle2 size={12} />} />
+            <Stat label={t("statMonthWage")} value={fmt(monthWageTotal)} icon={<Calendar size={12} />} />
+            <Stat label={t("statTotalOwed")} value={fmt(totalOwed)} tone={totalOwed > 0 ? "bad" : "good"} icon={<Wallet size={12} />} />
+          </div>
+
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
+                <Wallet size={15} /> {t("whoToPayTitle")}
+              </div>
+              {employeesWithOwed.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAdminTab("report")}
+                  className="text-[var(--accent)] text-xs font-medium hover:opacity-80 transition-opacity"
+                >
+                  {t("seeAll")}
+                </button>
+              )}
+            </div>
+            {employeesWithOwed.length === 0 && (
+              <p className="text-[var(--text-muted)] text-sm text-center py-6">{t("allPaidUp")}</p>
+            )}
+            <div className="space-y-2.5">
+              {employeesWithOwed.slice(0, 5).map(({ emp, remaining }) => (
+                <div key={emp.id} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Avatar src={emp.avatar} name={emp.name} size={30} />
+                    <span className="text-[var(--text-primary)] text-sm truncate">{emp.name}</span>
+                  </div>
+                  <span className="text-[var(--bad)] text-sm font-semibold font-mono tabular-nums shrink-0">{fmt(remaining)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {adminTab === "employees" && (
+        <div className="space-y-5">
+          ...
       {adminTab === "employees" && (
         <div className="space-y-5">
           {!showAddForm ? (
@@ -1677,7 +1753,7 @@ export default function WorkforceApp() {
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
 
-  const [adminTab, setAdminTab] = useState("employees");
+  const [adminTab, setAdminTab] = useState("dashboard");
   const [newEmp, setNewEmp] = useState({ name: "", username: "", password: "", dailyWage: "" });
   const [empError, setEmpError] = useState("");
   const [attDate, setAttDate] = useState(todayISO());
