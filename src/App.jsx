@@ -39,6 +39,11 @@ function attEntryWage(raw, emp, date) {
   return wageForDate(emp, date);
 }
 
+function employeeJoinDate(emp) {
+  if (Array.isArray(emp.wageHistory) && emp.wageHistory.length > 0) return emp.wageHistory[0].date;
+  return "2000-01-01"; // eski (tarixsiz) ishchilar uchun — hamma joyda ko'rinaveradi
+}
+
 const LANGS = [
   { code: "uz", label: "O'zbekcha" },
   { code: "ru", label: "Русский" },
@@ -1296,12 +1301,13 @@ function AdminApp({
                   const isToday = d === todayISO();
                   const isSelected = d === attDate;
                   const isFuture = d > todayISO();
-                  const markedCount = myEmployees.filter((emp) => attendance[emp.id]?.[d] !== undefined).length;
-                  const dotColor = myEmployees.length === 0 || isFuture
+                                    const dayEmployees = myEmployees.filter((emp) => employeeJoinDate(emp) <= d);
+                  const markedCount = dayEmployees.filter((emp) => attendance[emp.id]?.[d] !== undefined).length;
+                  const dotColor = dayEmployees.length === 0 || isFuture
                     ? "transparent"
                     : markedCount === 0
                       ? "var(--border-input)"
-                      : markedCount < myEmployees.length
+                      : markedCount < dayEmployees.length
                         ? "var(--warn)"
                         : "var(--good)";
                   const style = isFuture
@@ -1338,25 +1344,29 @@ function AdminApp({
             </div>
           </div>
 
-          {myEmployees.length > 0 && attDate <= todayISO() && (
+                    {(() => {
+            const visibleEmployees = myEmployees.filter((emp) => employeeJoinDate(emp) <= attDate);
+            return (
+              <>
+          {visibleEmployees.length > 0 && attDate <= todayISO() && (
             <div className="flex gap-1.5">
               <button
                 type="button"
-                onClick={() => bulkMarkAttendance(myEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 1)}
+                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 1)}
                 className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--good-soft)] text-[var(--good)] hover:opacity-80 transition-opacity"
               >
                 <CheckCircle2 size={13} /> {t("markAllFull")}
               </button>
               <button
                 type="button"
-                onClick={() => bulkMarkAttendance(myEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 0.5)}
+                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 0.5)}
                 className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--warn-soft)] text-[var(--warn)] hover:opacity-80 transition-opacity"
               >
                 <Calendar size={13} /> {t("markAllHalf")}
               </button>
               <button
                 type="button"
-                onClick={() => bulkMarkAttendance(myEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 0)}
+                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 0)}
                 className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--bad-soft)] text-[var(--bad)] hover:opacity-80 transition-opacity"
               >
                 <XCircle size={13} /> {t("markAllAbsent")}
@@ -1365,13 +1375,13 @@ function AdminApp({
           )}
           
           <div className="space-y-2">
-            {myEmployees.length === 0 && (
+            {visibleEmployees.length === 0 && (
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
             )}
-            {myEmployees.length > 0 && attDate > todayISO() && (
+            {visibleEmployees.length > 0 && attDate > todayISO() && (
               <p className="text-[var(--warn)] text-xs text-center py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">{t("futureDateWarning")}</p>
             )}
-            {myEmployees.map((emp) => {
+            {visibleEmployees.map((emp) => {
               const st = attEntryStatus(attendance[emp.id]?.[attDate]);
               const hasEntry = attendance[emp.id]?.[attDate] !== undefined;
               const isFuture = attDate > todayISO();
@@ -1415,8 +1425,11 @@ function AdminApp({
                   </div>
                 </div>
               );
-            })}
+                        })}
           </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
