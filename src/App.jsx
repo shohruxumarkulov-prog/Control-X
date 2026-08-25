@@ -1298,9 +1298,7 @@ function AdminApp({
         </div>
       )}
 
-      {adminTab === "employees" && (
-        <div className="space-y-5">
-          ...
+        
       {adminTab === "employees" && (
         <div className="space-y-5">
           {!showAddForm ? (
