@@ -272,69 +272,6 @@ async function safeSet(key, value) {
   }
 }
 
-async function loadOrg(adminUsername) {
-  const raw = await safeGet(`org-${adminUsername}`);
-  if (raw) {
-    try { return JSON.parse(raw); } catch (e) {}
-  }
-  return { employees: [], attendance: {}, advances: {} };
-}
-
-async function persistOrgData(adminUsername, org) {
-  await safeSet(`org-${adminUsername}`, JSON.stringify(org));
-}
-
-async function migrateToPerAdminStorage() {
-  const alreadyDone = await safeGet("migration-v2-done");
-  if (alreadyDone === "true") return;
-
-  let oldUsers = null, oldAttendance = {}, oldAdvances = {};
-  try {
-    const rawUsers = await safeGet("users-data");
-    oldUsers = rawUsers ? JSON.parse(rawUsers) : null;
-  } catch (e) {}
-  try {
-    const rawAtt = await safeGet("attendance-data");
-    oldAttendance = rawAtt ? JSON.parse(rawAtt) : {};
-  } catch (e) {}
-  try {
-    const rawAdv = await safeGet("advances-data");
-    oldAdvances = rawAdv ? JSON.parse(rawAdv) : {};
-  } catch (e) {}
-
-  if (!oldUsers || !oldUsers.admins) {
-    await safeSet("migration-v2-done", "true");
-    return;
-  }
-
-  const adminAccounts = {};
-  const employeesIndex = {};
-
-  for (const [uname, adata] of Object.entries(oldUsers.admins)) {
-    adminAccounts[uname] = { password: adata.password, avatar: adata.avatar || null };
-
-    const myEmployees = (oldUsers.employees || []).filter((e) => e.owner === uname);
-    const myAttendance = {};
-    const myAdvances = {};
-    myEmployees.forEach((emp) => {
-      employeesIndex[emp.username] = { owner: uname, employeeId: emp.id };
-      if (oldAttendance[emp.id]) myAttendance[emp.id] = oldAttendance[emp.id];
-      if (oldAdvances[emp.id]) myAdvances[emp.id] = oldAdvances[emp.id];
-    });
-
-    await persistOrgData(uname, {
-      employees: myEmployees,
-      attendance: myAttendance,
-      advances: myAdvances,
-    });
-  }
-
-  await safeSet("admin-accounts", JSON.stringify(adminAccounts));
-  await safeSet("employees-index", JSON.stringify(employeesIndex));
-  await safeSet("migration-v2-done", "true");
-  // Diqqat: eski "users-data", "attendance-data", "advances-data" kalitlariga tegmaymiz — zaxira bo'lib qoladi
-}
-
 function fileToAvatarDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1825,7 +1762,6 @@ export default function WorkforceApp() {
   }, [currentUser]);
 
   async function init() {
-    await migrateToPerAdminStorage();
     let usersVal = null;
     try {
       const raw = await safeGet("users-data");
