@@ -1825,6 +1825,7 @@ export default function WorkforceApp() {
   }, [currentUser]);
 
   async function init() {
+    await migrateToPerAdminStorage();
     let usersVal = null;
     try {
       const raw = await safeGet("users-data");
