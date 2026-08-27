@@ -272,80 +272,6 @@ async function safeSet(key, value) {
   }
 }
 
-/* ============================================================
-   HAR BIR ADMIN UCHUN ALOHIDA SAQLASH (org-<username>)
-   ============================================================ */
-
-function getOwnerUsername(user) {
-  if (!user) return null;
-  return user.role === "admin" ? user.username : user.owner;
-}
-
-async function loadOrg(adminUsername) {
-  const raw = await safeGet(`org-${adminUsername}`);
-  if (raw) {
-    try { return JSON.parse(raw); } catch (e) {}
-  }
-  return { employees: [], attendance: {}, advances: {} };
-}
-
-async function persistOrgData(adminUsername, org) {
-  await safeSet(`org-${adminUsername}`, JSON.stringify(org));
-}
-
-// Migratsiya faqat BIR MARTA ishlaydi ("migration-v2-done" bayrog'i orqali).
-// Eski kalitlarga ("users-data", "attendance-data", "advances-data") HECH QACHON tegmaydi —
-// faqat ulardan o'qib, yangi joyga nusxa oladi.
-async function migrateToPerAdminStorage() {
-  const alreadyDone = await safeGet("migration-v2-done");
-  if (alreadyDone === "true") return;
-
-  let oldUsers = null, oldAttendance = {}, oldAdvances = {};
-  try {
-    const rawUsers = await safeGet("users-data");
-    oldUsers = rawUsers ? JSON.parse(rawUsers) : null;
-  } catch (e) {}
-  try {
-    const rawAtt = await safeGet("attendance-data");
-    oldAttendance = rawAtt ? JSON.parse(rawAtt) : {};
-  } catch (e) {}
-  try {
-    const rawAdv = await safeGet("advances-data");
-    oldAdvances = rawAdv ? JSON.parse(rawAdv) : {};
-  } catch (e) {}
-
-  if (!oldUsers || !oldUsers.admins) {
-    await safeSet("migration-v2-done", "true");
-    return;
-  }
-
-  const adminAccounts = {};
-  const employeesIndex = {};
-
-  for (const [uname, adata] of Object.entries(oldUsers.admins)) {
-    adminAccounts[uname] = { password: adata.password, avatar: adata.avatar || null };
-
-    const myEmployees = (oldUsers.employees || []).filter((e) => e.owner === uname);
-    const myAttendance = {};
-    const myAdvances = {};
-    myEmployees.forEach((emp) => {
-      employeesIndex[emp.username] = { owner: uname, employeeId: emp.id };
-      if (oldAttendance[emp.id]) myAttendance[emp.id] = oldAttendance[emp.id];
-      if (oldAdvances[emp.id]) myAdvances[emp.id] = oldAdvances[emp.id];
-    });
-
-    await persistOrgData(uname, {
-      employees: myEmployees,
-      attendance: myAttendance,
-      advances: myAdvances,
-    });
-  }
-
-  await safeSet("admin-accounts", JSON.stringify(adminAccounts));
-  await safeSet("employees-index", JSON.stringify(employeesIndex));
-  await safeSet("migration-v2-done", "true");
-}
-
 function fileToAvatarDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1153,9 +1079,9 @@ function ProfileDrawer({
 }
 
 function AdminApp({
-  adminAccounts, myEmployees, currentUser, onLogout, summaryFor,
+  usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
-  newEmp, setNewEmp, empError, setEmpError, addEmployee, deleteEmployee, updateEmployeeWage,
+  newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
@@ -1166,7 +1092,8 @@ function AdminApp({
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const { t } = useApp();
-  const myAdmin = adminAccounts[currentUser.username] || { password: "", avatar: null };
+  const myAdmin = usersData.admins[currentUser.username] || { password: "", avatar: null };
+  const myEmployees = usersData.employees.filter((e) => e.owner === currentUser.username);
   const tabs = [
     { id: "employees", label: t("navEmployees"), icon: <Users size={18} /> },
     { id: "attendance", label: t("navAttendance"), icon: <Calendar size={18} /> },
@@ -1634,7 +1561,7 @@ function AdminApp({
 }
 
 function EmployeeApp({
-  currentUser, myEmployee, summaryFor, onLogout,
+  currentUser, usersData, summaryFor, onLogout,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1728,15 +1655,9 @@ function EmployeeApp({
 
 export default function WorkforceApp() {
   const [loading, setLoading] = useState(true);
-
-  // Endi UCHTA alohida davlat (state) bor:
-  // 1) adminAccounts — HAMMA adminlarning login/parol/avatar (kichik, faqat login uchun kerak)
-  // 2) employeesIndex — username -> {owner, employeeId} (kichik, faqat ishchi login uchun kerak)
-  // 3) org — FAQAT kirgan foydalanuvchining o'z adminiga tegishli employees/attendance/advances
-  const [adminAccounts, setAdminAccountsState] = useState({});
-  const [employeesIndex, setEmployeesIndexState] = useState({});
-  const [org, setOrgState] = useState({ employees: [], attendance: {}, advances: {} });
-
+  const [usersData, setUsersData] = useState(null);
+  const [attendance, setAttendance] = useState({});
+  const [advances, setAdvances] = useState({});
   const [currentUser, setCurrentUserState] = useState(() => {
     try {
       const raw = localStorage.getItem("current-user");
@@ -1780,10 +1701,7 @@ export default function WorkforceApp() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Realtime: faqat KERAKLI kalitlarni tinglaymiz —
-  // "admin-accounts", "employees-index" va joriy foydalanuvchining o'ziga tegishli "org-<username>"
   useEffect(() => {
-    const ownerUsername = getOwnerUsername(currentUser);
     const channel = supabase
       .channel("app_storage_live")
       .on(
@@ -1793,13 +1711,9 @@ export default function WorkforceApp() {
           const row = payload.new;
           if (!row || typeof row.value === "undefined") return;
           try {
-            if (row.key === "admin-accounts") {
-              setAdminAccountsState(JSON.parse(row.value));
-            } else if (row.key === "employees-index") {
-              setEmployeesIndexState(JSON.parse(row.value));
-            } else if (ownerUsername && row.key === `org-${ownerUsername}`) {
-              setOrgState(JSON.parse(row.value));
-            }
+            if (row.key === "users-data") setUsersData(JSON.parse(row.value));
+            else if (row.key === "attendance-data") setAttendance(JSON.parse(row.value));
+            else if (row.key === "advances-data") setAdvances(JSON.parse(row.value));
           } catch (e) {
           }
         }
@@ -1808,7 +1722,7 @@ export default function WorkforceApp() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser]);
+  }, []);
 
   useEffect(() => {
     try {
@@ -1848,91 +1762,89 @@ export default function WorkforceApp() {
   }, [currentUser]);
 
   async function init() {
-    // Eski (bitta umumiy) tuzilmadan yangi (admin bo'yicha) tuzilmaga bir martalik ko'chirish.
-    // Eski kalitlarga HECH QACHON tegmaydi.
-    await migrateToPerAdminStorage();
-
-    let accounts = {};
+    let usersVal = null;
     try {
-      const raw = await safeGet("admin-accounts");
-      accounts = raw ? JSON.parse(raw) : {};
+      const raw = await safeGet("users-data");
+      usersVal = raw ? JSON.parse(raw) : null;
     } catch (e) {
-      accounts = {};
+      usersVal = null;
     }
-    if (Object.keys(accounts).length === 0) {
-      accounts = { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } };
-      await safeSet("admin-accounts", JSON.stringify(accounts));
+    if (!usersVal) {
+      usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: [] };
+      await safeSet("users-data", JSON.stringify(usersVal));
+    } else if (usersVal.admin && !usersVal.admins) {
+      const owner = usersVal.admin.username;
+      usersVal = {
+        admins: { [owner]: { password: usersVal.admin.password, avatar: usersVal.admin.avatar || null } },
+        employees: (usersVal.employees || []).map((e) => ({ ...e, owner })),
+      };
+      await safeSet("users-data", JSON.stringify(usersVal));
+    } else if (!usersVal.admins) {
+      usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: usersVal.employees || [] };
+      await safeSet("users-data", JSON.stringify(usersVal));
     }
-    setAdminAccountsState(accounts);
+    setUsersData(usersVal);
 
-    let index = {};
-    try {
-      const raw = await safeGet("employees-index");
-      index = raw ? JSON.parse(raw) : {};
-    } catch (e) {
-      index = {};
-    }
-    setEmployeesIndexState(index);
-
-    // Agar foydalanuvchi avvalroq kirgan bo'lsa (localStorage'da saqlangan) —
-    // FAQAT o'ziga tegishli org-<username> ni yuklaymiz, boshqa hech kimnikini emas.
-    if (currentUser) {
-      const ownerUsername = getOwnerUsername(currentUser);
-      if (ownerUsername) {
-        const orgData = await loadOrg(ownerUsername);
-        const stillValid = currentUser.role === "admin"
-          ? !!accounts[ownerUsername]
-          : orgData.employees.some((e) => e.id === currentUser.id);
-        if (stillValid) {
-          setOrgState(orgData);
-        } else {
-          setCurrentUser(null);
-        }
-      } else {
-        setCurrentUser(null);
+    setCurrentUserState((prevUser) => {
+      if (!prevUser) return prevUser;
+      const stillValid = prevUser.role === "admin"
+        ? !!usersVal.admins[prevUser.username]
+        : (usersVal.employees || []).some((e) => e.id === prevUser.id);
+      if (!stillValid) {
+        try { localStorage.removeItem("current-user"); } catch (e) {}
+        return null;
       }
+      return prevUser;
+    });
+
+    try {
+      const rawAtt = await safeGet("attendance-data");
+      setAttendance(rawAtt ? JSON.parse(rawAtt) : {});
+    } catch (e) {
+      setAttendance({});
+    }
+
+    try {
+      const rawAdv = await safeGet("advances-data");
+      setAdvances(rawAdv ? JSON.parse(rawAdv) : {});
+    } catch (e) {
+      setAdvances({});
     }
 
     setLoading(false);
   }
 
-  async function persistAdminAccounts(data) {
-    setAdminAccountsState(data);
-    await safeSet("admin-accounts", JSON.stringify(data));
+  async function persistUsers(data) {
+    setUsersData(data);
+    await safeSet("users-data", JSON.stringify(data));
   }
-  async function persistEmployeesIndex(data) {
-    setEmployeesIndexState(data);
-    await safeSet("employees-index", JSON.stringify(data));
+  async function persistAttendance(data) {
+    setAttendance(data);
+    await safeSet("attendance-data", JSON.stringify(data));
   }
-  async function persistOrg(ownerUsername, data) {
-    setOrgState(data);
-    await safeSet(`org-${ownerUsername}`, JSON.stringify(data));
+  async function persistAdvances(data) {
+    setAdvances(data);
+    await safeSet("advances-data", JSON.stringify(data));
   }
 
-  async function handleLogin(asAdmin) {
+  function handleLogin(asAdmin) {
     setLoginError("");
     try {
       const username = loginForm.username.trim();
       const password = loginForm.password;
+      const admins = (usersData && usersData.admins) ? usersData.admins : { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password } };
+      const employees = (usersData && usersData.employees) ? usersData.employees : [];
 
       if (asAdmin) {
-        const acc = adminAccounts[username];
-        if (acc && acc.password === password) {
-          const orgData = await loadOrg(username);
-          setOrgState(orgData);
+        if (admins[username] && admins[username].password === password) {
           setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username });
           return;
         }
       } else {
-        const idx = employeesIndex[username];
-        if (idx) {
-          const orgData = await loadOrg(idx.owner);
-          const emp = orgData.employees.find((e) => e.id === idx.employeeId && e.password === password);
-          if (emp) {
-            setOrgState(orgData);
-            setCurrentUser({ role: "employee", id: emp.id, name: emp.name, owner: idx.owner });
-            return;
-          }
+        const emp = employees.find((x) => x.username === username && x.password === password);
+        if (emp) {
+          setCurrentUser({ role: "employee", id: emp.id, name: emp.name, owner: emp.owner });
+          return;
         }
       }
       setLoginError(makeT(lang)("wrongLogin"));
@@ -1942,18 +1854,17 @@ export default function WorkforceApp() {
   }
 
   function registerAdmin(newUsername, newPassword) {
+    const admins = usersData.admins || {};
     if (!newUsername || !newUsername.trim()) return { error: makeT(lang)("errEmptyLogin") };
     const uname = newUsername.trim();
-    if (adminAccounts[uname] || employeesIndex[uname]) {
+    if (admins[uname] || usersData.employees.some((e) => e.username === uname)) {
       return { error: makeT(lang)("errLoginTaken") };
     }
     if (!newPassword || newPassword.length < 4) {
       return { error: makeT(lang)("errShortPassword") };
     }
-    const updatedAccounts = { ...adminAccounts, [uname]: { password: newPassword, avatar: null } };
-    persistAdminAccounts(updatedAccounts);
-    const newOrg = { employees: [], attendance: {}, advances: {} };
-    persistOrg(uname, newOrg);
+    const updated = { ...usersData, admins: { ...admins, [uname]: { password: newPassword, avatar: null } } };
+    persistUsers(updated);
     setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username: uname });
     return {};
   }
@@ -1961,13 +1872,12 @@ export default function WorkforceApp() {
   function logout() {
     setCurrentUser(null);
     setLoginForm({ username: "", password: "" });
-    setOrgState({ employees: [], attendance: {}, advances: {} });
   }
 
   function summaryFor(empId) {
-    const emp = org.employees.find((x) => x.id === empId);
+    const emp = usersData.employees.find((x) => x.id === empId);
     if (!emp) return null;
-    const att = org.attendance[empId] || {};
+    const att = attendance[empId] || {};
     let workedDays = 0;
     let totalWage = 0;
     for (const [date, raw] of Object.entries(att)) {
@@ -1975,7 +1885,7 @@ export default function WorkforceApp() {
       workedDays += v;
       totalWage += v * attEntryWage(raw, emp, date);
     }
-    const advList = org.advances[empId] || [];
+    const advList = advances[empId] || [];
     const totalAvans = advList.filter((a) => a.type !== "salary").reduce((sum, a) => sum + Number(a.amount), 0);
     const totalSalaryPaid = advList.filter((a) => a.type === "salary").reduce((sum, a) => sum + Number(a.amount), 0);
     const totalAdvance = totalAvans + totalSalaryPaid;
@@ -1988,25 +1898,22 @@ export default function WorkforceApp() {
       setEmpError(makeT(lang)("fillAllFields"));
       return;
     }
-    const uname = newEmp.username.trim();
-    if (adminAccounts[uname] || employeesIndex[uname]) {
+    if (usersData.employees.some((x) => x.username === newEmp.username) || Object.keys(usersData.admins).includes(newEmp.username)) {
       setEmpError(makeT(lang)("errLoginTaken"));
       return;
     }
     const id = "e" + Date.now();
     const wage = Number(newEmp.dailyWage);
-    const newEmployee = {
-      id, name: newEmp.name, username: uname,
-      password: newEmp.password, dailyWage: wage, avatar: null,
-      owner: currentUser.username,
-      wageHistory: [{ date: todayISO(), wage }],
+    const updated = {
+      ...usersData,
+      employees: [...usersData.employees, {
+        id, name: newEmp.name, username: newEmp.username,
+        password: newEmp.password, dailyWage: wage, avatar: null,
+        owner: currentUser.username,
+        wageHistory: [{ date: todayISO(), wage }],
+      }],
     };
-    const updatedOrg = { ...org, employees: [...org.employees, newEmployee] };
-    await persistOrg(currentUser.username, updatedOrg);
-
-    const updatedIndex = { ...employeesIndex, [uname]: { owner: currentUser.username, employeeId: id } };
-    await persistEmployeesIndex(updatedIndex);
-
+    await persistUsers(updated);
     setNewEmp({ name: "", username: "", password: "", dailyWage: "" });
     confetti({
       particleCount: 100,
@@ -2016,126 +1923,84 @@ export default function WorkforceApp() {
   }
 
   async function deleteEmployee(id) {
-    const target = org.employees.find((x) => x.id === id);
-    if (!target) return;
-
-    const employees = org.employees.filter((x) => x.id !== id);
-    const attendance2 = { ...org.attendance }; delete attendance2[id];
-    const advances2 = { ...org.advances }; delete advances2[id];
-    await persistOrg(currentUser.username, { employees, attendance: attendance2, advances: advances2 });
-
-    const updatedIndex = { ...employeesIndex };
-    delete updatedIndex[target.username];
-    await persistEmployeesIndex(updatedIndex);
-
+    const target = usersData.employees.find((x) => x.id === id);
+    if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
+    await persistUsers({ ...usersData, employees: usersData.employees.filter((x) => x.id !== id) });
+    const att2 = { ...attendance }; delete att2[id]; await persistAttendance(att2);
+    const adv2 = { ...advances }; delete adv2[id]; await persistAdvances(adv2);
     if (advEmp === id) setAdvEmp("");
   }
 
   async function updateEmployeeWage(id, newWage) {
-    const target = org.employees.find((x) => x.id === id);
-    if (!target) return;
+    const target = usersData.employees.find((x) => x.id === id);
+    if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
     const today = todayISO();
     const history = Array.isArray(target.wageHistory) && target.wageHistory.length > 0
       ? target.wageHistory
       : [{ date: "2000-01-01", wage: target.dailyWage }];
     const withoutToday = history.filter((h) => h.date !== today);
     const newHistory = [...withoutToday, { date: today, wage: newWage }].sort((a, b) => (a.date < b.date ? -1 : 1));
-    const employees = org.employees.map((e) => (e.id === id ? { ...e, dailyWage: newWage, wageHistory: newHistory } : e));
-    await persistOrg(currentUser.username, { ...org, employees });
+    const employees = usersData.employees.map((e) => (e.id === id ? { ...e, dailyWage: newWage, wageHistory: newHistory } : e));
+    await persistUsers({ ...usersData, employees });
   }
 
   async function markAttendance(empId, status) {
     if (attDate > todayISO()) return;
-    const dayMap = { ...(org.attendance[empId] || {}) };
+    const dayMap = { ...(attendance[empId] || {}) };
     const currentStatus = attEntryStatus(dayMap[attDate]);
     if (dayMap[attDate] !== undefined && currentStatus === status) {
       delete dayMap[attDate];
     } else {
-      const emp = org.employees.find((e) => e.id === empId);
+      const emp = usersData.employees.find((e) => e.id === empId);
       dayMap[attDate] = { v: status, wage: Number(emp ? emp.dailyWage : 0) };
     }
-    const attendance = { ...org.attendance, [empId]: dayMap };
-    await persistOrg(currentUser.username, { ...org, attendance });
+    await persistAttendance({ ...attendance, [empId]: dayMap });
   }
 
   async function bulkMarkAttendance(empList, status) {
     if (attDate > todayISO()) return;
-    const attendance = { ...org.attendance };
+    const updated = { ...attendance };
     empList.forEach(({ id, wage }) => {
-      const dayMap = { ...(attendance[id] || {}) };
+      const dayMap = { ...(updated[id] || {}) };
       dayMap[attDate] = { v: status, wage: Number(wage || 0) };
-      attendance[id] = dayMap;
+      updated[id] = dayMap;
     });
-    await persistOrg(currentUser.username, { ...org, attendance });
+    await persistAttendance(updated);
   }
 
   async function addAdvance() {
     if (!advEmp || !advForm.amount) return;
-    const list = org.advances[advEmp] ? [...org.advances[advEmp]] : [];
+    const list = advances[advEmp] ? [...advances[advEmp]] : [];
     list.push({ id: "a" + Date.now(), amount: Number(advForm.amount), date: advForm.date, note: advForm.note, type: advForm.type || "avans" });
-    const advances = { ...org.advances, [advEmp]: list };
-    await persistOrg(currentUser.username, { ...org, advances });
+    await persistAdvances({ ...advances, [advEmp]: list });
     setAdvForm({ amount: "", date: todayISO(), note: "", type: advForm.type || "avans" });
   }
 
   async function deleteAdvance(empId, advId) {
-    const list = (org.advances[empId] || []).filter((a) => a.id !== advId);
-    const advances = { ...org.advances, [empId]: list };
-    await persistOrg(currentUser.username, { ...org, advances });
+    const list = (advances[empId] || []).filter((a) => a.id !== advId);
+    await persistAdvances({ ...advances, [empId]: list });
   }
 
-  async function changeOwnCredentials(newUsername, newPassword) {
+  function changeOwnCredentials(newUsername, newPassword) {
     if (!currentUser) return { error: "—" };
-    const newUname = newUsername.trim();
-
     if (currentUser.role === "admin") {
       const oldUsername = currentUser.username;
-      const taken = newUname !== oldUsername && (adminAccounts[newUname] || employeesIndex[newUname]);
+      const taken = newUsername !== oldUsername &&
+        (Object.keys(usersData.admins).includes(newUsername) || usersData.employees.some((e) => e.username === newUsername));
       if (taken) return { error: makeT(lang)("errLoginTaken") };
-
-      const updatedAccounts = { ...adminAccounts };
-      const data = updatedAccounts[oldUsername];
-      delete updatedAccounts[oldUsername];
-      updatedAccounts[newUname] = { ...data, password: newPassword };
-      await persistAdminAccounts(updatedAccounts);
-
-      if (newUname !== oldUsername) {
-        // Username o'zgarsa, org-<username> kalitini ham yangi nomga ko'chiramiz,
-        // aks holda ishchilar/davomat/avans "yetim" bo'lib qoladi.
-        const updatedEmployees = org.employees.map((e) => ({ ...e, owner: newUname }));
-        const movedOrg = { ...org, employees: updatedEmployees };
-        await persistOrg(newUname, movedOrg);
-        await safeSet(`org-${oldUsername}`, JSON.stringify({ employees: [], attendance: {}, advances: {} }));
-
-        const updatedIndex = { ...employeesIndex };
-        Object.keys(updatedIndex).forEach((uname) => {
-          if (updatedIndex[uname].owner === oldUsername) {
-            updatedIndex[uname] = { ...updatedIndex[uname], owner: newUname };
-          }
-        });
-        await persistEmployeesIndex(updatedIndex);
-      }
-
-      setCurrentUser({ role: "admin", name: currentUser.name, username: newUname });
+      const admins = { ...usersData.admins };
+      const data = admins[oldUsername];
+      delete admins[oldUsername];
+      admins[newUsername] = { ...data, password: newPassword };
+      const employees = usersData.employees.map((e) => (e.owner === oldUsername ? { ...e, owner: newUsername } : e));
+      persistUsers({ ...usersData, admins, employees });
+      setCurrentUser({ role: "admin", name: currentUser.name, username: newUsername });
       return {};
     }
-
-    // Ishchi o'z login-parolini o'zgartirmoqda
-    const taken = (employeesIndex[newUname] && employeesIndex[newUname].employeeId !== currentUser.id) || adminAccounts[newUname];
+    const taken = usersData.employees.some((e) => e.id !== currentUser.id && e.username === newUsername) || Object.keys(usersData.admins).includes(newUsername);
     if (taken) return { error: makeT(lang)("errLoginTaken") };
-
-    const oldEmp = org.employees.find((e) => e.id === currentUser.id);
-    if (!oldEmp) return { error: "—" };
-    const oldUsername = oldEmp.username;
-
-    const employees = org.employees.map((e) => (e.id === currentUser.id ? { ...e, username: newUname, password: newPassword } : e));
-    await persistOrg(currentUser.owner, { ...org, employees });
-
-    const updatedIndex = { ...employeesIndex };
-    delete updatedIndex[oldUsername];
-    updatedIndex[newUname] = { owner: currentUser.owner, employeeId: currentUser.id };
-    await persistEmployeesIndex(updatedIndex);
-
+    const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, username: newUsername, password: newPassword } : e));
+    persistUsers({ ...usersData, employees });
     setCurrentUser({ role: "employee", id: currentUser.id, name: currentUser.name, owner: currentUser.owner });
     return {};
   }
@@ -2143,25 +2008,18 @@ export default function WorkforceApp() {
   async function deleteOwnAccount() {
     if (!currentUser) return;
     if (currentUser.role === "admin") {
-      const updatedAccounts = { ...adminAccounts };
-      delete updatedAccounts[currentUser.username];
-      await persistAdminAccounts(updatedAccounts);
-
-      const updatedIndex = { ...employeesIndex };
-      org.employees.forEach((e) => delete updatedIndex[e.username]);
-      await persistEmployeesIndex(updatedIndex);
-
-      await safeSet(`org-${currentUser.username}`, JSON.stringify({ employees: [], attendance: {}, advances: {} }));
+      const admins = { ...usersData.admins };
+      delete admins[currentUser.username];
+      const ownedIds = usersData.employees.filter((e) => e.owner === currentUser.username).map((e) => e.id);
+      const employees = usersData.employees.filter((e) => e.owner !== currentUser.username);
+      await persistUsers({ ...usersData, admins, employees });
+      const att2 = { ...attendance }; ownedIds.forEach((id) => delete att2[id]); await persistAttendance(att2);
+      const adv2 = { ...advances }; ownedIds.forEach((id) => delete adv2[id]); await persistAdvances(adv2);
     } else {
-      const emp = org.employees.find((e) => e.id === currentUser.id);
-      const employees = org.employees.filter((e) => e.id !== currentUser.id);
-      const attendance2 = { ...org.attendance }; delete attendance2[currentUser.id];
-      const advances2 = { ...org.advances }; delete advances2[currentUser.id];
-      await persistOrg(currentUser.owner, { employees, attendance: attendance2, advances: advances2 });
-
-      const updatedIndex = { ...employeesIndex };
-      if (emp) delete updatedIndex[emp.username];
-      await persistEmployeesIndex(updatedIndex);
+      const employees = usersData.employees.filter((e) => e.id !== currentUser.id);
+      await persistUsers({ ...usersData, employees });
+      const att2 = { ...attendance }; delete att2[currentUser.id]; await persistAttendance(att2);
+      const adv2 = { ...advances }; delete adv2[currentUser.id]; await persistAdvances(adv2);
     }
     logout();
   }
@@ -2213,11 +2071,11 @@ export default function WorkforceApp() {
   async function updateAvatar(dataUrl) {
     if (!currentUser) return;
     if (currentUser.role === "admin") {
-      const updated = { ...adminAccounts, [currentUser.username]: { ...adminAccounts[currentUser.username], avatar: dataUrl } };
-      await persistAdminAccounts(updated);
+      const admins = { ...usersData.admins, [currentUser.username]: { ...usersData.admins[currentUser.username], avatar: dataUrl } };
+      await persistUsers({ ...usersData, admins });
     } else {
-      const employees = org.employees.map((e) => (e.id === currentUser.id ? { ...e, avatar: dataUrl } : e));
-      await persistOrg(currentUser.owner, { ...org, employees });
+      const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, avatar: dataUrl } : e));
+      await persistUsers({ ...usersData, employees });
     }
   }
 
@@ -2245,8 +2103,7 @@ export default function WorkforceApp() {
   } else if (currentUser.role === "admin") {
     screen = (
       <AdminApp
-        adminAccounts={adminAccounts}
-        myEmployees={org.employees}
+        usersData={usersData}
         currentUser={currentUser}
         onLogout={logout}
         summaryFor={summaryFor}
@@ -2255,16 +2112,15 @@ export default function WorkforceApp() {
         newEmp={newEmp}
         setNewEmp={setNewEmp}
         empError={empError}
-        setEmpError={setEmpError}
         addEmployee={addEmployee}
         deleteEmployee={deleteEmployee}
         updateEmployeeWage={updateEmployeeWage}
-        attendance={org.attendance}
+        attendance={attendance}
         attDate={attDate}
         setAttDate={setAttDate}
         markAttendance={markAttendance}
         bulkMarkAttendance={bulkMarkAttendance}
-        advances={org.advances}
+        advances={advances}
         advEmp={advEmp}
         setAdvEmp={setAdvEmp}
         advForm={advForm}
@@ -2287,6 +2143,7 @@ export default function WorkforceApp() {
     screen = (
       <EmployeeApp
         currentUser={currentUser}
+        usersData={usersData}
         summaryFor={summaryFor}
         onLogout={logout}
         changeOwnCredentials={changeOwnCredentials}
