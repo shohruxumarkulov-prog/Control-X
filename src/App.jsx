@@ -611,10 +611,16 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className={`text-sm font-semibold font-mono tabular-nums ${s.remaining < 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
-            {fmt(s.remaining)}
-          </div>
+                <div className="flex items-center gap-2 shrink-0">
+          {s.remaining === 0 ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold" style={{ backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}>
+              <Check size={11} /> To'liq to'landi
+            </span>
+          ) : (
+            <div className={`text-sm font-semibold font-mono tabular-nums ${s.remaining < 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
+              {fmt(s.remaining)}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -702,8 +708,14 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
               <div className="text-[var(--bad)] text-sm font-semibold font-mono tabular-nums">{fmt(s.totalAdvance)}</div>
               <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">{t("advance")}</div>
             </div>
-            <div className="text-center">
-              <div className="text-[var(--good)] text-sm font-semibold font-mono tabular-nums">{fmt(s.remaining)}</div>
+                        <div className="text-center">
+              {s.remaining === 0 ? (
+                <div className="flex items-center justify-center gap-1 text-[var(--warn)] text-sm font-semibold">
+                  <Check size={13} />
+                </div>
+              ) : (
+                <div className="text-[var(--good)] text-sm font-semibold font-mono tabular-nums">{fmt(s.remaining)}</div>
+              )}
               <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">{t("remaining")}</div>
             </div>
           </div>
@@ -1542,7 +1554,15 @@ function AdminApp({
                       <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmtDays(s.workedDays)}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmt(s.totalWage)}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--bad)] font-mono tabular-nums">-{fmt(s.totalAdvance)}</td>
-                      <td className="py-2.5 px-5 text-right font-semibold text-[var(--good)] font-mono tabular-nums">{fmt(s.remaining)}</td>
+                                            <td className="py-2.5 px-5 text-right font-semibold">
+                        {s.remaining === 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold" style={{ backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}>
+                            <Check size={11} /> To'liq
+                          </span>
+                        ) : (
+                          <span className="text-[var(--good)] font-mono tabular-nums">{fmt(s.remaining)}</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
