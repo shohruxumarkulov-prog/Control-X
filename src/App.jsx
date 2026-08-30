@@ -1542,7 +1542,8 @@ function AdminApp({
                   <th className="text-right font-medium py-2.5 px-3">{t("colDays")}</th>
                   <th className="text-right font-medium py-2.5 px-3">{t("colCalculated")}</th>
                   <th className="text-right font-medium py-2.5 px-3">{t("colAdvance")}</th>
-                  <th className="text-right font-medium py-2.5 px-5">{t("colRemaining")}</th>
+                  <th className="text-right font-medium py-2.5 px-3">{t("colRemaining")}</th>
+                  <th className="text-right font-medium py-2.5 px-5">Qarz</th>
                 </tr>
               </thead>
               <tbody>
