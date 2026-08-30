@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
@@ -1102,6 +1102,7 @@ function AdminApp({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [empSearch, setEmpSearch] = useState("");
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const { t } = useApp();
   const myAdmin = usersData.admins[currentUser.username] || { password: "", avatar: null };
@@ -1275,13 +1276,34 @@ function AdminApp({
             </div>
           )}
 
+                   {myEmployees.length > 0 && (
+            <div className="relative">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                value={empSearch}
+                onChange={(e) => setEmpSearch(e.target.value)}
+                placeholder="Ism bo'yicha qidirish..."
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
-            {myEmployees.length === 0 && (
-              <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
-            )}
-            {myEmployees.map((emp) => (
-              <EmployeeRow key={emp.id} emp={emp} summary={summaryFor(emp.id)} onDelete={() => deleteEmployee(emp.id)} onUpdateWage={(w) => updateEmployeeWage(emp.id, w)} />
-            ))}
+            {(() => {
+              const filteredEmployees = myEmployees.filter((emp) =>
+                emp.name.toLowerCase().includes(empSearch.trim().toLowerCase())
+              );
+              if (myEmployees.length === 0) {
+                return <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>;
+              }
+              if (filteredEmployees.length === 0) {
+                return <p className="text-[var(--text-muted)] text-sm text-center py-8">Hech kim topilmadi</p>;
+              }
+              return filteredEmployees.map((emp) => (
+                <EmployeeRow key={emp.id} emp={emp} summary={summaryFor(emp.id)} onDelete={() => deleteEmployee(emp.id)} onUpdateWage={(w) => updateEmployeeWage(emp.id, w)} />
+              ));
+            })()}
           </div>
         </div>
       )}
