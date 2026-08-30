@@ -1566,8 +1566,8 @@ function AdminApp({
                     </tr>
                   );
                 })}
-                {myEmployees.length === 0 && (
-                  <tr><td colSpan={5} className="py-8 text-center text-[var(--text-muted)]">{t("noData")}</td></tr>
+                  {myEmployees.length === 0 && (
+                  <tr><td colSpan={6} className="py-8 text-center text-[var(--text-muted)]">{t("noData")}</td></tr>
                 )}
               </tbody>
             </table>
