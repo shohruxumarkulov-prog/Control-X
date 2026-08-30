@@ -1553,14 +1553,21 @@ function AdminApp({
                       <td className="py-2.5 px-5 text-[var(--text-primary)]">{emp.name}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmtDays(s.workedDays)}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmt(s.totalWage)}</td>
-                      <td className="py-2.5 px-3 text-right text-[var(--bad)] font-mono tabular-nums">-{fmt(s.totalAdvance)}</td>
-                                            <td className="py-2.5 px-5 text-right font-semibold">
+                                            <td className="py-2.5 px-3 text-right text-[var(--bad)] font-mono tabular-nums">-{fmt(s.totalAdvance)}</td>
+                      <td className="py-2.5 px-3 text-right font-semibold font-mono tabular-nums">
                         {s.remaining === 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold" style={{ backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}>
-                            <Check size={11} /> To'liq
-                          </span>
+                          <Check size={14} className="inline text-[var(--warn)]" />
+                        ) : s.remaining < 0 ? (
+                          <span className="text-[var(--text-faint)]">—</span>
                         ) : (
-                          <span className="text-[var(--good)] font-mono tabular-nums">{fmt(s.remaining)}</span>
+                          <span className="text-[var(--good)]">{fmt(s.remaining)}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-5 text-right font-semibold font-mono tabular-nums">
+                        {s.remaining < 0 ? (
+                          <span className="text-[var(--bad)]">{fmt(Math.abs(s.remaining))}</span>
+                        ) : (
+                          <span className="text-[var(--text-faint)]">—</span>
                         )}
                       </td>
                     </tr>
