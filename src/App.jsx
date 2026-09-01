@@ -1539,7 +1539,22 @@ function AdminApp({
         </div>
       )}
 
-      {adminTab === "report" && (
+            {adminTab === "report" && (
+        <div className="space-y-4">
+          {(() => {
+            const totalOwed = myEmployees.reduce((sum, emp) => {
+              const r = summaryFor(emp.id).remaining;
+              return sum + (r > 0 ? r : 0);
+            }, 0);
+            return (
+              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm text-center">
+                <div className="text-[var(--text-muted)] text-xs mb-1.5">Jami to'lash kerak</div>
+                <div className={`text-3xl font-bold font-mono tabular-nums ${totalOwed > 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
+                  {fmt(totalOwed)}
+                </div>
+              </div>
+            );
+          })()}
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
           <div className="p-5 pb-3 flex items-center justify-between gap-2">
             <div className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
@@ -1602,6 +1617,7 @@ function AdminApp({
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
       </div>
