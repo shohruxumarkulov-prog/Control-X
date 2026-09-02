@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search, LayoutDashboard
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
@@ -1640,7 +1640,7 @@ function EmployeeApp({
     .map(([date, raw]) => [date, attEntryStatus(raw), attEntryWage(raw, s.emp, date)])
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
    const empTabs = [
-    { id: "umumiy", label: "Umumiy", icon: <LayoutDashboard size={18} /> },
+    { id: "umumiy", label: "Umumiy", icon: <Users size={18} /> },
     { id: "davomat", label: "Davomat", icon: <Calendar size={18} /> },
     { id: "avanslar", label: "Avanslar", icon: <Wallet size={18} /> },
   ];
