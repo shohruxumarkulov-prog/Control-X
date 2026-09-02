@@ -352,12 +352,14 @@ function Stat({ label, value, tone = "default", icon }) {
     good: "text-[var(--good)]",
     bad: "text-[var(--bad)]",
   };
+  const valueLength = String(value).length;
+  const sizeClass = valueLength > 12 ? "text-sm" : valueLength > 9 ? "text-base" : "text-lg";
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
-      <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-1.5">
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm min-w-0 overflow-hidden">
+      <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-1.5 truncate">
         {icon}{label}
       </div>
-      <div className={`text-lg font-semibold font-mono tabular-nums ${toneMap[tone]}`}>{value}</div>
+      <div className={`${sizeClass} font-semibold font-mono tabular-nums leading-tight break-words ${toneMap[tone]}`}>{value}</div>
     </div>
   );
 }
