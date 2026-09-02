@@ -1639,11 +1639,36 @@ function EmployeeApp({
   const attDays = Object.entries(s.att)
     .map(([date, raw]) => [date, attEntryStatus(raw), attEntryWage(raw, s.emp, date)])
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  const empTabs = [
+    const empTabs = [
     { id: "umumiy", label: "Umumiy" },
     { id: "davomat", label: "Davomat" },
     { id: "avanslar", label: "Avanslar" },
   ];
+
+  const empBottomNav = (
+    <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
+        {empTabs.map((tab) => {
+          const active = empTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setEmpTab(tab.id)}
+              className="flex-1 flex justify-center"
+            >
+              <span
+                className="w-full text-center py-2.5 rounded-full text-xs font-medium transition-colors"
+                style={active ? { backgroundColor: accent + "26", color: accent } : { color: "var(--text-muted)" }}
+              >
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
 
   return (
     <>
@@ -1667,26 +1692,9 @@ function EmployeeApp({
         userName={currentUser.name}
         avatar={s.emp.avatar || null}
         onTitleClick={() => setDrawerOpen(true)}
+        bottomNav={empBottomNav}
       >
-          <div className="flex bg-[var(--bg-card)] border border-[var(--border)] rounded-full p-1 mb-5">
-          {empTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setEmpTab(tab.id)}
-              className="flex-1 py-2 rounded-full text-xs font-medium transition-colors"
-              style={
-                empTab === tab.id
-                  ? { backgroundColor: accent, color: "#12161c" }
-                  : { color: "var(--text-secondary)" }
-              }
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-          {empTab === "umumiy" && (
+                 {empTab === "umumiy" && (
           <div className="tab-transition space-y-3">
             <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm text-center">
               <div className="flex items-center justify-center gap-1.5 text-[var(--text-muted)] text-xs mb-1.5">
