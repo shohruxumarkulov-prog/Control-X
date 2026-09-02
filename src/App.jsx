@@ -353,13 +353,13 @@ function Stat({ label, value, tone = "default", icon }) {
     bad: "text-[var(--bad)]",
   };
   const valueLength = String(value).length;
-  const sizeClass = valueLength > 12 ? "text-sm" : valueLength > 9 ? "text-base" : "text-lg";
+  const sizeClass = valueLength > 13 ? "text-xs" : valueLength > 10 ? "text-sm" : valueLength > 8 ? "text-base" : "text-lg";
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm min-w-0 overflow-hidden">
-      <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-1.5 truncate">
-        {icon}{label}
+      <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-1.5 leading-snug">
+        {icon}<span>{label}</span>
       </div>
-      <div className={`${sizeClass} font-semibold font-mono tabular-nums leading-tight break-words ${toneMap[tone]}`}>{value}</div>
+      <div className={`${sizeClass} font-semibold font-mono tabular-nums leading-tight whitespace-nowrap ${toneMap[tone]}`}>{value}</div>
     </div>
   );
 }
@@ -1686,12 +1686,19 @@ function EmployeeApp({
           ))}
         </div>
 
-        {empTab === "umumiy" && (
-          <div className="tab-transition">
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
+          {empTab === "umumiy" && (
+          <div className="tab-transition space-y-3">
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm text-center">
+              <div className="flex items-center justify-center gap-1.5 text-[var(--text-muted)] text-xs mb-1.5">
+                <Wallet size={13} /> {t("statRemainingSalary")}
+              </div>
+              <div className="text-3xl font-bold font-mono tabular-nums text-[var(--good)]">
+                {fmt(s.remaining)}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
               <Stat label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} />
-              <Stat label={t("statRemainingSalary")} value={fmt(s.remaining)} tone="good" icon={<Wallet size={12} />} />
             </div>
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <Stat label={t("typeAvans")} value={fmt(s.totalAvans)} tone="bad" icon={<TrendingDown size={12} />} />
@@ -1699,7 +1706,6 @@ function EmployeeApp({
             </div>
           </div>
         )}
-
         {empTab === "davomat" && (
           <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm tab-transition">
             <div className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center justify-between">
