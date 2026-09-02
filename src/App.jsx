@@ -1806,7 +1806,6 @@ function EmployeeApp({
             ))}
           </div>
         )}
-        )}
       </Shell>
     </>
   );
