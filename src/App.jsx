@@ -1639,13 +1639,12 @@ function EmployeeApp({
   const attDays = Object.entries(s.att)
     .map(([date, raw]) => [date, attEntryStatus(raw), attEntryWage(raw, s.emp, date)])
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
-    const empTabs = [
-    { id: "umumiy", label: "Umumiy" },
-    { id: "davomat", label: "Davomat" },
-    { id: "avanslar", label: "Avanslar" },
+   const empTabs = [
+    { id: "umumiy", label: "Umumiy", icon: <LayoutDashboard size={18} /> },
+    { id: "davomat", label: "Davomat", icon: <Calendar size={18} /> },
+    { id: "avanslar", label: "Avanslar", icon: <Wallet size={18} /> },
   ];
-
-  const empBottomNav = (
+    const empBottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
       <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
         {empTabs.map((tab) => {
@@ -1658,9 +1657,10 @@ function EmployeeApp({
               className="flex-1 flex justify-center"
             >
               <span
-                className="w-full text-center py-2.5 rounded-full text-xs font-medium transition-colors"
+                className="w-full flex flex-col items-center gap-0.5 px-4 py-2.5 rounded-full text-[10px] font-medium transition-colors"
                 style={active ? { backgroundColor: accent + "26", color: accent } : { color: "var(--text-muted)" }}
               >
+                {tab.icon}
                 {tab.label}
               </span>
             </button>
