@@ -1634,6 +1634,7 @@ function EmployeeApp({
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [empTab, setEmpTab] = useState("umumiy");
+  const [attMonthOffset, setAttMonthOffset] = useState(0);
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
@@ -1714,53 +1715,97 @@ function EmployeeApp({
             </div>
           </div>
         )}
-        {empTab === "davomat" && (
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm tab-transition">
-            <div className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center justify-between">
-              <span>{t("myWorkedDays")}</span>
-              <span className="text-[var(--text-muted)] text-xs font-normal">{s.emp.dailyWage ? fmt(s.emp.dailyWage) + t("perDay") : ""}</span>
-            </div>
-            {attDays.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAttendanceYet")}</p>}
-            <div className="space-y-1.5">
-              {attDays.map(([date, v, wage]) => (
-                <div key={date} className="flex items-center justify-between text-sm py-1">
-                  <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
-                    {v === 0 ? (
-                      <XCircle size={13} className="text-[var(--bad)]" />
-                    ) : (
-                      <CheckCircle2 size={13} className={v === 1 ? "text-[var(--good)]" : "text-[var(--warn)]"} />
-                    )}
-                    {date} {v === 0.5 && <span className="text-[10px] text-[var(--warn)]">({t("halfDay")})</span>}
-                    {v === 0 && <span className="text-[10px] text-[var(--bad)]">({t("absent")})</span>}
-                  </span>
-                  <span className={`font-mono tabular-nums ${v === 0 ? "text-[var(--bad)] text-xs" : "text-[var(--text-muted)] text-xs"}`}>{fmt(v * wage)}</span>
+                {empTab === "davomat" && (() => {
+          const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
+          const base = new Date();
+          base.setDate(1);
+          base.setMonth(base.getMonth() + attMonthOffset);
+          const year = base.getFullYear();
+          const month = base.getMonth();
+          const monthLabel = base.toLocaleDateString(localeTag, { month: "long", year: "numeric" });
+          const daysInMonth = new Date(year, month + 1, 0).getDate();
+          const startWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+          const attMap = Object.fromEntries(attDays.map(([date, v, wage]) => [date, [v, wage]]));
+          const cells = [];
+          for (let i = 0; i < startWeekday; i++) cells.push(null);
+          for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+          const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+          const monthEntries = attDays.filter(([date]) => date.startsWith(monthPrefix));
+          const monthWorkedDays = monthEntries.reduce((sum, [, v]) => sum + v, 0);
+          const monthWage = monthEntries.reduce((sum, [, v, w]) => sum + v * w, 0);
+          const weekdayLabels = localeTag === "uz-UZ" ? ["D", "S", "CH", "P", "J", "SH", "Y"] : ["M", "T", "W", "T", "F", "S", "S"];
+
+          return (
+            <div className="tab-transition space-y-3">
+              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <button type="button" onClick={() => setAttMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)]">
+                    <ChevronLeft size={15} />
+                  </button>
+                  <span className="text-[var(--text-primary)] text-sm font-semibold capitalize">{monthLabel}</span>
+                  <button type="button" onClick={() => setAttMonthOffset((o) => Math.min(0, o + 1))} disabled={attMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] disabled:opacity-30">
+                    <ChevronRight size={15} />
+                  </button>
                 </div>
-              ))}
+                <div className="grid grid-cols-7 gap-1 mb-1.5">
+                  {weekdayLabels.map((w, i) => (
+                    <div key={i} className="text-center text-[9px] text-[var(--text-muted)] uppercase">{w}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {cells.map((d, i) => {
+                    if (d === null) return <div key={i} />;
+                    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                    const entry = attMap[dateStr];
+                    const isFuture = dateStr > todayISO();
+                    let style = { backgroundColor: "var(--bg-app)", color: "var(--text-faint)", border: "1px solid var(--border-input)" };
+                    if (!isFuture && entry) {
+                      const v = entry[0];
+                      if (v === 1) style = { backgroundColor: "var(--good)", color: "#0e1712" };
+                      else if (v === 0.5) style = { backgroundColor: "var(--warn)", color: "#1a1608" };
+                      else style = { backgroundColor: "var(--bad)", color: "#1c0e0c" };
+                    }
+                    return (
+                      <div key={i} className="aspect-square rounded-md flex items-center justify-center text-[11px] font-medium" style={style}>
+                        {d}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <Stat label="Shu oy ishlagan" value={fmtDays(monthWorkedDays)} icon={<Calendar size={12} />} />
+                <Stat label="Shu oy hisoblangan" value={fmt(monthWage)} tone="good" icon={<Wallet size={12} />} />
+              </div>
             </div>
+          );
+        })()}
+                {empTab === "avanslar" && (
+          <div className="space-y-2 tab-transition">
+            {s.advList.length === 0 && (
+              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
+                <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
+              </div>
+            )}
+            {s.advList.slice().reverse().map((a) => (
+              <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                  style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                >
+                  {a.type === "salary" ? <Wallet size={17} /> : <TrendingDown size={17} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums">{fmt(a.amount)}</div>
+                  <div className="text-[var(--text-muted)] text-xs truncate">
+                    {a.type === "salary" ? t("typeSalary") : t("typeAvans")} · {a.date}{a.note ? ` · ${a.note}` : ""}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
-
-        {empTab === "avanslar" && (
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm tab-transition">
-            <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("myAdvances")}</div>
-            {s.advList.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>}
-            <div className="space-y-2">
-              {s.advList.slice().reverse().map((a) => (
-                <div key={a.id} className="flex items-center justify-between text-sm py-1">
-                  <span className="text-[var(--text-primary)] flex items-center gap-2">
-                    <span className="font-mono tabular-nums">{fmt(a.amount)}</span>
-                    <span
-                      className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded"
-                      style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-                    >
-                      {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
-                    </span>
-                  </span>
-                  <span className="text-[var(--text-muted)] text-xs">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         )}
       </Shell>
     </>
