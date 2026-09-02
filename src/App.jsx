@@ -1633,11 +1633,17 @@ function EmployeeApp({
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [empTab, setEmpTab] = useState("umumiy");
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
     .map(([date, raw]) => [date, attEntryStatus(raw), attEntryWage(raw, s.emp, date)])
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  const empTabs = [
+    { id: "umumiy", label: "Umumiy" },
+    { id: "davomat", label: "Davomat" },
+    { id: "avanslar", label: "Avanslar" },
+  ];
 
   return (
     <>
@@ -1662,65 +1668,90 @@ function EmployeeApp({
         avatar={s.emp.avatar || null}
         onTitleClick={() => setDrawerOpen(true)}
       >
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
-          <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
-          <Stat label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} />
-          <Stat label={t("statRemainingSalary")} value={fmt(s.remaining)} tone="good" icon={<Wallet size={12} />} />
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-6">
-          <Stat label={t("typeAvans")} value={fmt(s.totalAvans)} tone="bad" icon={<TrendingDown size={12} />} />
-          <Stat label={t("typeSalary")} value={fmt(s.totalSalaryPaid)} tone="bad" icon={<Wallet size={12} />} />
-        </div>
-
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-5 shadow-sm">
-          <div className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center justify-between">
-            <span>{t("myWorkedDays")}</span>
-            <span className="text-[var(--text-muted)] text-xs font-normal">{s.emp.dailyWage ? fmt(s.emp.dailyWage) + t("perDay") : ""}</span>
-          </div>
-          {attDays.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAttendanceYet")}</p>}
-          <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-            {attDays.map(([date, v, wage]) => (
-              <div key={date} className="flex items-center justify-between text-sm py-1">
-                <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
-                  {v === 0 ? (
-                    <XCircle size={13} className="text-[var(--bad)]" />
-                  ) : (
-                    <CheckCircle2 size={13} className={v === 1 ? "text-[var(--good)]" : "text-[var(--warn)]"} />
-                  )}
-                  {date} {v === 0.5 && <span className="text-[10px] text-[var(--warn)]">({t("halfDay")})</span>}
-                  {v === 0 && <span className="text-[10px] text-[var(--bad)]">({t("absent")})</span>}
-                </span>
-                <span className={`font-mono tabular-nums ${v === 0 ? "text-[var(--bad)] text-xs" : "text-[var(--text-muted)] text-xs"}`}>{fmt(v * wage)}</span>
-              </div>
-            ))}
-          </div>
+          <div className="flex bg-[var(--bg-card)] border border-[var(--border)] rounded-full p-1 mb-5">
+          {empTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setEmpTab(tab.id)}
+              className="flex-1 py-2 rounded-full text-xs font-medium transition-colors"
+              style={
+                empTab === tab.id
+                  ? { backgroundColor: accent, color: "#12161c" }
+                  : { color: "var(--text-secondary)" }
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
-          <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("myAdvances")}</div>
-          {s.advList.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>}
-          <div className="space-y-2">
-            {s.advList.slice().reverse().map((a) => (
-              <div key={a.id} className="flex items-center justify-between text-sm py-1">
-                <span className="text-[var(--text-primary)] flex items-center gap-2">
-                  <span className="font-mono tabular-nums">{fmt(a.amount)}</span>
-                  <span
-                    className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded"
-                    style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-                  >
-                    {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+        {empTab === "umumiy" && (
+          <div className="tab-transition">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
+              <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
+              <Stat label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} />
+              <Stat label={t("statRemainingSalary")} value={fmt(s.remaining)} tone="good" icon={<Wallet size={12} />} />
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <Stat label={t("typeAvans")} value={fmt(s.totalAvans)} tone="bad" icon={<TrendingDown size={12} />} />
+              <Stat label={t("typeSalary")} value={fmt(s.totalSalaryPaid)} tone="bad" icon={<Wallet size={12} />} />
+            </div>
+          </div>
+        )}
+
+        {empTab === "davomat" && (
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm tab-transition">
+            <div className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center justify-between">
+              <span>{t("myWorkedDays")}</span>
+              <span className="text-[var(--text-muted)] text-xs font-normal">{s.emp.dailyWage ? fmt(s.emp.dailyWage) + t("perDay") : ""}</span>
+            </div>
+            {attDays.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAttendanceYet")}</p>}
+            <div className="space-y-1.5">
+              {attDays.map(([date, v, wage]) => (
+                <div key={date} className="flex items-center justify-between text-sm py-1">
+                  <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
+                    {v === 0 ? (
+                      <XCircle size={13} className="text-[var(--bad)]" />
+                    ) : (
+                      <CheckCircle2 size={13} className={v === 1 ? "text-[var(--good)]" : "text-[var(--warn)]"} />
+                    )}
+                    {date} {v === 0.5 && <span className="text-[10px] text-[var(--warn)]">({t("halfDay")})</span>}
+                    {v === 0 && <span className="text-[10px] text-[var(--bad)]">({t("absent")})</span>}
                   </span>
-                </span>
-                <span className="text-[var(--text-muted)] text-xs">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
-              </div>
-            ))}
+                  <span className={`font-mono tabular-nums ${v === 0 ? "text-[var(--bad)] text-xs" : "text-[var(--text-muted)] text-xs"}`}>{fmt(v * wage)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {empTab === "avanslar" && (
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm tab-transition">
+            <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("myAdvances")}</div>
+            {s.advList.length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>}
+            <div className="space-y-2">
+              {s.advList.slice().reverse().map((a) => (
+                <div key={a.id} className="flex items-center justify-between text-sm py-1">
+                  <span className="text-[var(--text-primary)] flex items-center gap-2">
+                    <span className="font-mono tabular-nums">{fmt(a.amount)}</span>
+                    <span
+                      className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded"
+                      style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                    >
+                      {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+                    </span>
+                  </span>
+                  <span className="text-[var(--text-muted)] text-xs">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </Shell>
     </>
   );
 }
-
 export default function WorkforceApp() {
   const [loading, setLoading] = useState(true);
   const [usersData, setUsersData] = useState(null);
