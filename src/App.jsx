@@ -1789,12 +1789,12 @@ function EmployeeApp({
               </div>
             )}
               {s.advList.slice().reverse().map((a) => (
-              <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm flex items-center gap-3">
+              <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                  className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                   style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
                 >
-                  {a.type === "salary" ? <Wallet size={17} /> : <TrendingDown size={17} />}
+                  {a.type === "salary" ? <Wallet size={14} /> : <TrendingDown size={14} />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
