@@ -1636,42 +1636,6 @@ function EmployeeApp({
   const [empTab, setEmpTab] = useState("umumiy");
   const [attMonthOffset, setAttMonthOffset] = useState(0);
   const [advMonthKey, setAdvMonthKey] = useState(todayISO().slice(0, 7));
-  const advScrollRef = useRef(null);
-  const advMonthRefs = useRef({});
-  const advScrollRafRef = useRef(null);
-
-  function handleAdvScroll() {
-    if (advScrollRafRef.current) return;
-    advScrollRafRef.current = requestAnimationFrame(() => {
-      advScrollRafRef.current = null;
-      const container = advScrollRef.current;
-      if (!container) return;
-      const containerCenter = container.getBoundingClientRect().left + container.clientWidth / 2;
-      let closestKey = null;
-      let closestDist = Infinity;
-      Object.entries(advMonthRefs.current).forEach(([key, el]) => {
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const center = rect.left + rect.width / 2;
-        const dist = Math.abs(center - containerCenter);
-        if (dist < closestDist) { closestDist = dist; closestKey = key; }
-      });
-      if (closestKey && closestKey !== advMonthKey) setAdvMonthKey(closestKey);
-    });
-  }
-
-  function scrollAdvToMonth(key) {
-    const el = advMonthRefs.current[key];
-    if (el) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const el = advMonthRefs.current[advMonthKey];
-      if (el) el.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" });
-    }, 60);
-    return () => clearTimeout(timer);
-  }, []);
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
@@ -1818,83 +1782,82 @@ function EmployeeApp({
             </div>
           );
         })()}
-              {empTab === "avanslar" && (() => {
-          const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
-          const monthNamesUz = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
-          const months = Array.from({ length: 24 }, (_, i) => {
-            const d = new Date();
-            d.setDate(1);
-            d.setMonth(d.getMonth() - (23 - i));
-            const mIdx = d.getMonth();
-            const yy = String(d.getFullYear()).slice(-2);
-            const name = localeTag === "uz-UZ" ? monthNamesUz[mIdx] : d.toLocaleDateString(localeTag, { month: "long" });
-            const label = (mIdx === 11 || mIdx === 0) ? `${yy}-${name}` : name;
-            return { key: `${d.getFullYear()}-${String(mIdx + 1).padStart(2, "0")}`, label };
-          });
-          const filteredAdv = s.advList.filter((a) => a.date.startsWith(advMonthKey));
+      {empTab === "avanslar" && (() => {
+  const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
+  const monthNamesUz = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
 
-          return (
-            <div className="space-y-3 tab-transition">
-              <div
-                ref={advScrollRef}
-                onScroll={handleAdvScroll}
-                className="flex items-center gap-4 overflow-x-auto pb-1 -mx-5 px-5"
-                style={{ scrollSnapType: "x proximity", scrollbarWidth: "none" }}
-              >
-                {months.map((m) => {
-                  const active = advMonthKey === m.key;
-                  return (
-                    <button
-                      key={m.key}
-                      ref={(el) => { advMonthRefs.current[m.key] = el; }}
-                      type="button"
-                      onClick={() => scrollAdvToMonth(m.key)}
-                      className="shrink-0 transition-all capitalize"
-                      style={{
-                        scrollSnapAlign: "center",
-                        fontSize: active ? 19 : 13,
-                        fontWeight: active ? 700 : 500,
-                        color: active ? "var(--text-primary)" : "var(--text-faint)",
-                        opacity: active ? 1 : 0.6,
-                      }}
-                    >
-                      {m.label}
-                    </button>
-                  );
-                })}
-              </div>
+  function shiftMonthKey(key, offset) {
+    const [y, m] = key.split("-").map(Number);
+    const d = new Date(y, m - 1 + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
 
-              {filteredAdv.length === 0 && (
-                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
-                  <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
-                </div>
-              )}
-              {filteredAdv.slice().reverse().map((a) => (
-                <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                    style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-                  >
-                    {a.type === "salary" ? <Wallet size={14} /> : <TrendingDown size={14} />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
-                    <span
-                      className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full inline-block mr-1.5"
-                      style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-                    >
-                      {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
-                    </span>
-                    <span className="text-[var(--text-muted)] text-xs">{a.date}</span>
-                  </div>
-                  {a.note && (
-                    <div className="text-[var(--text-primary)] text-sm font-bold text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          );
-        })()}
+  function monthLabel(key) {
+    const [y, m] = key.split("-").map(Number);
+    const d = new Date(y, m - 1, 1);
+    const mIdx = d.getMonth();
+    const yy = String(y).slice(-2);
+    const name = localeTag === "uz-UZ" ? monthNamesUz[mIdx] : d.toLocaleDateString(localeTag, { month: "long" });
+    return (mIdx === 11 || mIdx === 0) ? `${yy}-${name}` : name;
+  }
+
+  const prevKey = shiftMonthKey(advMonthKey, -1);
+  const nextKey = shiftMonthKey(advMonthKey, 1);
+  const filteredAdv = s.advList.filter((a) => a.date.startsWith(advMonthKey));
+
+  return (
+    <div className="space-y-3 tab-transition">
+      <div className="flex items-center justify-center gap-3 py-1">
+        <button
+          type="button"
+          onClick={() => setAdvMonthKey(prevKey)}
+          className="shrink-0 px-3 py-1.5 rounded-lg border border-[var(--border-input)] text-[var(--text-faint)] text-xs font-medium capitalize hover:text-[var(--text-secondary)] transition-colors"
+        >
+          {monthLabel(prevKey)}
+        </button>
+        <span className="shrink-0 px-4 py-1.5 rounded-lg border-2 text-[var(--text-primary)] text-base font-bold capitalize" style={{ borderColor: accent }}>
+          {monthLabel(advMonthKey)}
+        </span>
+        <button
+          type="button"
+          onClick={() => setAdvMonthKey(nextKey)}
+          className="shrink-0 px-3 py-1.5 rounded-lg border border-[var(--border-input)] text-[var(--text-faint)] text-xs font-medium capitalize hover:text-[var(--text-secondary)] transition-colors"
+        >
+          {monthLabel(nextKey)}
+        </button>
+      </div>
+
+      {filteredAdv.length === 0 && (
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
+          <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
+        </div>
+      )}
+      {filteredAdv.slice().reverse().map((a) => (
+        <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+            style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+          >
+            {a.type === "salary" ? <Wallet size={14} /> : <TrendingDown size={14} />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
+            <span
+              className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full inline-block mr-1.5"
+              style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+            >
+              {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+            </span>
+            <span className="text-[var(--text-muted)] text-xs">{a.date}</span>
+          </div>
+          {a.note && (
+            <div className="text-[var(--text-primary)] text-sm font-bold text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+})()}
       </Shell>
     </>
   );
