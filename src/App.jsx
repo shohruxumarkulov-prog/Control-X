@@ -1636,6 +1636,42 @@ function EmployeeApp({
   const [empTab, setEmpTab] = useState("umumiy");
   const [attMonthOffset, setAttMonthOffset] = useState(0);
   const [advMonthKey, setAdvMonthKey] = useState(todayISO().slice(0, 7));
+  const advScrollRef = useRef(null);
+  const advMonthRefs = useRef({});
+  const advScrollRafRef = useRef(null);
+
+  function handleAdvScroll() {
+    if (advScrollRafRef.current) return;
+    advScrollRafRef.current = requestAnimationFrame(() => {
+      advScrollRafRef.current = null;
+      const container = advScrollRef.current;
+      if (!container) return;
+      const containerCenter = container.getBoundingClientRect().left + container.clientWidth / 2;
+      let closestKey = null;
+      let closestDist = Infinity;
+      Object.entries(advMonthRefs.current).forEach(([key, el]) => {
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const center = rect.left + rect.width / 2;
+        const dist = Math.abs(center - containerCenter);
+        if (dist < closestDist) { closestDist = dist; closestKey = key; }
+      });
+      if (closestKey && closestKey !== advMonthKey) setAdvMonthKey(closestKey);
+    });
+  }
+
+  function scrollAdvToMonth(key) {
+    const el = advMonthRefs.current[key];
+    if (el) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const el = advMonthRefs.current[advMonthKey];
+      if (el) el.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" });
+    }, 60);
+    return () => clearTimeout(timer);
+  }, []);
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
@@ -1782,37 +1818,50 @@ function EmployeeApp({
             </div>
           );
         })()}
-                {empTab === "avanslar" && (() => {
+              {empTab === "avanslar" && (() => {
           const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
-          const months = Array.from({ length: 12 }, (_, i) => {
+          const monthNamesUz = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+          const months = Array.from({ length: 24 }, (_, i) => {
             const d = new Date();
             d.setDate(1);
-            d.setMonth(d.getMonth() - (11 - i));
-            return {
-              key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-              label: d.toLocaleDateString(localeTag, { month: "short", year: "2-digit" }),
-            };
+            d.setMonth(d.getMonth() - (23 - i));
+            const mIdx = d.getMonth();
+            const yy = String(d.getFullYear()).slice(-2);
+            const name = localeTag === "uz-UZ" ? monthNamesUz[mIdx] : d.toLocaleDateString(localeTag, { month: "long" });
+            const label = (mIdx === 11 || mIdx === 0) ? `${yy}-${name}` : name;
+            return { key: `${d.getFullYear()}-${String(mIdx + 1).padStart(2, "0")}`, label };
           });
           const filteredAdv = s.advList.filter((a) => a.date.startsWith(advMonthKey));
 
           return (
-            <div className="space-y-2 tab-transition">
-              <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-                {months.map((m) => (
-                  <button
-                    key={m.key}
-                    type="button"
-                    onClick={() => setAdvMonthKey(m.key)}
-                    className="shrink-0 px-3.5 py-2 rounded-full text-xs font-medium capitalize transition-colors"
-                    style={
-                      advMonthKey === m.key
-                        ? { backgroundColor: accent, color: "#12161c" }
-                        : { backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }
-                    }
-                  >
-                    {m.label}
-                  </button>
-                ))}
+            <div className="space-y-3 tab-transition">
+              <div
+                ref={advScrollRef}
+                onScroll={handleAdvScroll}
+                className="flex items-center gap-4 overflow-x-auto pb-1 -mx-5 px-5"
+                style={{ scrollSnapType: "x proximity", scrollbarWidth: "none" }}
+              >
+                {months.map((m) => {
+                  const active = advMonthKey === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      ref={(el) => { advMonthRefs.current[m.key] = el; }}
+                      type="button"
+                      onClick={() => scrollAdvToMonth(m.key)}
+                      className="shrink-0 transition-all capitalize"
+                      style={{
+                        scrollSnapAlign: "center",
+                        fontSize: active ? 19 : 13,
+                        fontWeight: active ? 700 : 500,
+                        color: active ? "var(--text-primary)" : "var(--text-faint)",
+                        opacity: active ? 1 : 0.6,
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
               </div>
 
               {filteredAdv.length === 0 && (
