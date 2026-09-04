@@ -1636,6 +1636,42 @@ function EmployeeApp({
   const [empTab, setEmpTab] = useState("umumiy");
   const [attMonthOffset, setAttMonthOffset] = useState(0);
   const [advMonthKey, setAdvMonthKey] = useState(todayISO().slice(0, 7));
+  const advScrollRef = useRef(null);
+  const advMonthRefs = useRef({});
+  const advScrollRafRef = useRef(null);
+
+  function handleAdvScroll() {
+    if (advScrollRafRef.current) return;
+    advScrollRafRef.current = requestAnimationFrame(() => {
+      advScrollRafRef.current = null;
+      const container = advScrollRef.current;
+      if (!container) return;
+      const containerCenter = container.getBoundingClientRect().left + container.clientWidth / 2;
+      let closestKey = null;
+      let closestDist = Infinity;
+      Object.entries(advMonthRefs.current).forEach(([key, el]) => {
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const center = rect.left + rect.width / 2;
+        const dist = Math.abs(center - containerCenter);
+        if (dist < closestDist) { closestDist = dist; closestKey = key; }
+      });
+      if (closestKey && closestKey !== advMonthKey) setAdvMonthKey(closestKey);
+    });
+  }
+
+  function scrollAdvToMonth(key) {
+    const el = advMonthRefs.current[key];
+    if (el) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const el = advMonthRefs.current[advMonthKey];
+      if (el) el.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" });
+    }, 60);
+    return () => clearTimeout(timer);
+  }, []);
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
@@ -1802,25 +1838,28 @@ function EmployeeApp({
   return (
     <div className="space-y-3 tab-transition">
       <div
+        ref={advScrollRef}
+        onScroll={handleAdvScroll}
         className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5"
-        style={{ scrollbarWidth: "none", scrollSnapType: "x proximity" }}
+        style={{ scrollbarWidth: "none", scrollSnapType: "x mandatory" }}
       >
         {months.map((m) => {
           const active = advMonthKey === m.key;
           return (
             <button
               key={m.key}
+              ref={(el) => { advMonthRefs.current[m.key] = el; }}
               type="button"
-              onClick={() => setAdvMonthKey(m.key)}
-              className="shrink-0 flex items-center justify-center text-center capitalize rounded-lg px-2 transition-colors"
+              onClick={() => scrollAdvToMonth(m.key)}
+              className="flex items-center justify-center text-center capitalize rounded-lg transition-all"
               style={{
                 scrollSnapAlign: "center",
-                minWidth: 92,
-                height: 44,
+                flex: "0 0 calc((100% - 16px) / 3)",
+                height: active ? 52 : 44,
                 border: active ? `2px solid ${accent}` : "1px solid var(--border-input)",
                 color: active ? "var(--text-primary)" : "var(--text-faint)",
                 fontWeight: active ? 700 : 500,
-                fontSize: 13,
+                fontSize: active ? 16 : 12,
                 backgroundColor: "var(--bg-card)",
               }}
             >
