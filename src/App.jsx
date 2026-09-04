@@ -1635,7 +1635,7 @@ function EmployeeApp({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [empTab, setEmpTab] = useState("umumiy");
   const [attMonthOffset, setAttMonthOffset] = useState(0);
-  const [advMonthOffset, setAdvMonthOffset] = useState(0);
+  const [advMonthKey, setAdvMonthKey] = useState(todayISO().slice(0, 7));
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
@@ -1784,57 +1784,66 @@ function EmployeeApp({
         })()}
                 {empTab === "avanslar" && (() => {
           const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
-          const base = new Date();
-          base.setDate(1);
-          base.setMonth(base.getMonth() + advMonthOffset);
-          const monthLabel = base.toLocaleDateString(localeTag, { month: "long", year: "numeric" });
-          const monthPrefix = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}`;
-          const filteredAdv = s.advList.filter((a) => a.date.startsWith(monthPrefix));
-          const monthTotal = filteredAdv.reduce((sum, a) => sum + Number(a.amount), 0);
+          const months = Array.from({ length: 12 }, (_, i) => {
+            const d = new Date();
+            d.setDate(1);
+            d.setMonth(d.getMonth() - (11 - i));
+            return {
+              key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+              label: d.toLocaleDateString(localeTag, { month: "short", year: "2-digit" }),
+            };
+          });
+          const filteredAdv = s.advList.filter((a) => a.date.startsWith(advMonthKey));
 
           return (
-          <div className="space-y-2 tab-transition">
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm flex items-center justify-between">
-              <button type="button" onClick={() => setAdvMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)]">
-                <ChevronLeft size={15} />
-              </button>
-              <div className="text-center">
-                <div className="text-[var(--text-primary)] text-sm font-semibold capitalize">{monthLabel}</div>
-                <div className="text-[var(--text-muted)] text-xs font-mono tabular-nums">{fmt(monthTotal)}</div>
+            <div className="space-y-2 tab-transition">
+              <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+                {months.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => setAdvMonthKey(m.key)}
+                    className="shrink-0 px-3.5 py-2 rounded-full text-xs font-medium capitalize transition-colors"
+                    style={
+                      advMonthKey === m.key
+                        ? { backgroundColor: accent, color: "#12161c" }
+                        : { backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }
+                    }
+                  >
+                    {m.label}
+                  </button>
+                ))}
               </div>
-              <button type="button" onClick={() => setAdvMonthOffset((o) => Math.min(0, o + 1))} disabled={advMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] disabled:opacity-30">
-                <ChevronRight size={15} />
-              </button>
-            </div>
-            {filteredAdv.length === 0 && (
-              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
-                <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
-              </div>
-            )}
-            {filteredAdv.slice().reverse().map((a) => (
-              <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                  style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-                >
-                  {a.type === "salary" ? <Wallet size={14} /> : <TrendingDown size={14} />}
+
+              {filteredAdv.length === 0 && (
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
+                  <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
-                  <span
-                    className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full inline-block mr-1.5"
+              )}
+              {filteredAdv.slice().reverse().map((a) => (
+                <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                     style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
                   >
-                    {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
-                  </span>
-                  <span className="text-[var(--text-muted)] text-xs">{a.date}</span>
+                    {a.type === "salary" ? <Wallet size={14} /> : <TrendingDown size={14} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
+                    <span
+                      className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full inline-block mr-1.5"
+                      style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                    >
+                      {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+                    </span>
+                    <span className="text-[var(--text-muted)] text-xs">{a.date}</span>
+                  </div>
+                  {a.note && (
+                    <div className="text-[var(--text-primary)] text-sm font-bold text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
+                  )}
                 </div>
-                {a.note && (
-                  <div className="text-[var(--text-primary)] text-sm font-bold text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
           );
         })()}
       </Shell>
