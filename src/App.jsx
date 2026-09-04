@@ -1786,45 +1786,48 @@ function EmployeeApp({
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
   const monthNamesUz = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
 
-  function shiftMonthKey(key, offset) {
-    const [y, m] = key.split("-").map(Number);
-    const d = new Date(y, m - 1 + offset, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }
-
-  function monthLabel(key) {
-    const [y, m] = key.split("-").map(Number);
-    const d = new Date(y, m - 1, 1);
+  const months = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - (23 - i));
     const mIdx = d.getMonth();
-    const yy = String(y).slice(-2);
+    const yy = d.getFullYear();
     const name = localeTag === "uz-UZ" ? monthNamesUz[mIdx] : d.toLocaleDateString(localeTag, { month: "long" });
-    return (mIdx === 11 || mIdx === 0) ? `${yy}-${name}` : name;
-  }
+    const label = (mIdx === 11 || mIdx === 0) ? `${yy} / ${name}` : name;
+    return { key: `${yy}-${String(mIdx + 1).padStart(2, "0")}`, label };
+  });
 
-  const prevKey = shiftMonthKey(advMonthKey, -1);
-  const nextKey = shiftMonthKey(advMonthKey, 1);
   const filteredAdv = s.advList.filter((a) => a.date.startsWith(advMonthKey));
 
   return (
     <div className="space-y-3 tab-transition">
-      <div className="flex items-center justify-center gap-3 py-1">
-        <button
-          type="button"
-          onClick={() => setAdvMonthKey(prevKey)}
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-[var(--border-input)] text-[var(--text-faint)] text-xs font-medium capitalize hover:text-[var(--text-secondary)] transition-colors"
-        >
-          {monthLabel(prevKey)}
-        </button>
-        <span className="shrink-0 px-4 py-1.5 rounded-lg border-2 text-[var(--text-primary)] text-base font-bold capitalize" style={{ borderColor: accent }}>
-          {monthLabel(advMonthKey)}
-        </span>
-        <button
-          type="button"
-          onClick={() => setAdvMonthKey(nextKey)}
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-[var(--border-input)] text-[var(--text-faint)] text-xs font-medium capitalize hover:text-[var(--text-secondary)] transition-colors"
-        >
-          {monthLabel(nextKey)}
-        </button>
+      <div
+        className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5"
+        style={{ scrollbarWidth: "none", scrollSnapType: "x proximity" }}
+      >
+        {months.map((m) => {
+          const active = advMonthKey === m.key;
+          return (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setAdvMonthKey(m.key)}
+              className="shrink-0 flex items-center justify-center text-center capitalize rounded-lg px-2 transition-colors"
+              style={{
+                scrollSnapAlign: "center",
+                minWidth: 92,
+                height: 44,
+                border: active ? `2px solid ${accent}` : "1px solid var(--border-input)",
+                color: active ? "var(--text-primary)" : "var(--text-faint)",
+                fontWeight: active ? 700 : 500,
+                fontSize: 13,
+                backgroundColor: "var(--bg-card)",
+              }}
+            >
+              {m.label}
+            </button>
+          );
+        })}
       </div>
 
       {filteredAdv.length === 0 && (
