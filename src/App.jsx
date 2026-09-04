@@ -1799,18 +1799,16 @@ function EmployeeApp({
                 <div className="min-w-0 flex-1">
                   <div className="text-[var(--text-primary)] text-base font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
                   <span
-                    className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full inline-block"
+                    className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full inline-block mr-1.5"
                     style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
                   >
                     {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
                   </span>
+                  <span className="text-[var(--text-muted)] text-xs">{a.date}</span>
                 </div>
-                <div className="text-right shrink-0 max-w-[38%]">
-                  <div className="text-[var(--text-secondary)] text-xs">{a.date}</div>
-                  {a.note && (
-                    <div className="text-[var(--text-muted)] text-xs mt-0.5 truncate">{a.note}</div>
-                  )}
-                </div>
+                {a.note && (
+                  <div className="text-[var(--text-muted)] text-xs text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
+                )}
               </div>
             ))}
           </div>
