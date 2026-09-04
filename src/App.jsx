@@ -1788,7 +1788,7 @@ function EmployeeApp({
                 <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
               </div>
             )}
-            {s.advList.slice().reverse().map((a) => (
+              {s.advList.slice().reverse().map((a) => (
               <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm flex items-center gap-3">
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
@@ -1798,17 +1798,17 @@ function EmployeeApp({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-[var(--text-primary)] text-base font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span
-                      className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0"
-                      style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-                    >
-                      {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
-                    </span>
-                    <span className="text-[var(--text-secondary)] text-xs">{a.date}</span>
-                  </div>
+                  <span
+                    className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full inline-block"
+                    style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                  >
+                    {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+                  </span>
+                </div>
+                <div className="text-right shrink-0 max-w-[38%]">
+                  <div className="text-[var(--text-secondary)] text-xs">{a.date}</div>
                   {a.note && (
-                    <div className="text-[var(--text-secondary)] text-xs mt-1 truncate">{a.note}</div>
+                    <div className="text-[var(--text-muted)] text-xs mt-0.5 truncate">{a.note}</div>
                   )}
                 </div>
               </div>
