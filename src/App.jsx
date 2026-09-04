@@ -1797,9 +1797,9 @@ function EmployeeApp({
                   {a.type === "salary" ? <Wallet size={17} /> : <TrendingDown size={17} />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[var(--text-primary)] text-base font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
+                  <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
                   <span
-                    className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full inline-block mr-1.5"
+                    className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full inline-block mr-1.5"
                     style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
                   >
                     {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
@@ -1807,7 +1807,7 @@ function EmployeeApp({
                   <span className="text-[var(--text-muted)] text-xs">{a.date}</span>
                 </div>
                 {a.note && (
-                  <div className="text-[var(--text-muted)] text-xs text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
+                  <div className="text-[var(--text-primary)] text-sm font-bold text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
                 )}
               </div>
             ))}
