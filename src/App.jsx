@@ -1666,12 +1666,20 @@ function EmployeeApp({
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const el = advMonthRefs.current[advMonthKey];
-      if (el) el.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" });
-    }, 60);
-    return () => clearTimeout(timer);
-  }, []);
+    if (empTab !== "avanslar") return;
+    let raf2 = null;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const el = advMonthRefs.current[advMonthKey];
+        if (el) el.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empTab]);
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
@@ -1822,10 +1830,12 @@ function EmployeeApp({
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
   const monthNamesUz = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
 
-  const months = Array.from({ length: 24 }, (_, i) => {
+  const PAST_MONTHS = 24;
+  const FUTURE_MONTHS = 1;
+  const months = Array.from({ length: PAST_MONTHS + FUTURE_MONTHS + 1 }, (_, i) => {
     const d = new Date();
     d.setDate(1);
-    d.setMonth(d.getMonth() - (23 - i));
+    d.setMonth(d.getMonth() - PAST_MONTHS + i);
     const mIdx = d.getMonth();
     const yy = d.getFullYear();
     const name = localeTag === "uz-UZ" ? monthNamesUz[mIdx] : d.toLocaleDateString(localeTag, { month: "long" });
@@ -1851,16 +1861,20 @@ function EmployeeApp({
               ref={(el) => { advMonthRefs.current[m.key] = el; }}
               type="button"
               onClick={() => scrollAdvToMonth(m.key)}
-              className="flex items-center justify-center text-center capitalize rounded-lg transition-all"
+              className="flex items-center justify-center text-center capitalize rounded-lg"
               style={{
                 scrollSnapAlign: "center",
                 flex: "0 0 calc((100% - 16px) / 3)",
-                height: active ? 52 : 44,
+                height: active ? 52 : 40,
                 border: active ? `2px solid ${accent}` : "1px solid var(--border-input)",
                 color: active ? "var(--text-primary)" : "var(--text-faint)",
                 fontWeight: active ? 700 : 500,
                 fontSize: active ? 16 : 12,
                 backgroundColor: "var(--bg-card)",
+                opacity: active ? 1 : 0.45,
+                filter: active ? "none" : "blur(1.2px)",
+                transform: active ? "scale(1)" : "scale(0.86)",
+                transition: "opacity 0.25s ease, filter 0.25s ease, transform 0.25s ease, height 0.25s ease, font-size 0.25s ease, border-color 0.25s ease",
               }}
             >
               {m.label}
