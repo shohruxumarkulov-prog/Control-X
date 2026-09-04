@@ -1635,6 +1635,7 @@ function EmployeeApp({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [empTab, setEmpTab] = useState("umumiy");
   const [attMonthOffset, setAttMonthOffset] = useState(0);
+  const [advMonthOffset, setAdvMonthOffset] = useState(0);
   const { t } = useApp();
   const s = summaryFor(currentUser.id);
   const attDays = Object.entries(s.att)
@@ -1781,14 +1782,36 @@ function EmployeeApp({
             </div>
           );
         })()}
-                {empTab === "avanslar" && (
+                {empTab === "avanslar" && (() => {
+          const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
+          const base = new Date();
+          base.setDate(1);
+          base.setMonth(base.getMonth() + advMonthOffset);
+          const monthLabel = base.toLocaleDateString(localeTag, { month: "long", year: "numeric" });
+          const monthPrefix = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}`;
+          const filteredAdv = s.advList.filter((a) => a.date.startsWith(monthPrefix));
+          const monthTotal = filteredAdv.reduce((sum, a) => sum + Number(a.amount), 0);
+
+          return (
           <div className="space-y-2 tab-transition">
-            {s.advList.length === 0 && (
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm flex items-center justify-between">
+              <button type="button" onClick={() => setAdvMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)]">
+                <ChevronLeft size={15} />
+              </button>
+              <div className="text-center">
+                <div className="text-[var(--text-primary)] text-sm font-semibold capitalize">{monthLabel}</div>
+                <div className="text-[var(--text-muted)] text-xs font-mono tabular-nums">{fmt(monthTotal)}</div>
+              </div>
+              <button type="button" onClick={() => setAdvMonthOffset((o) => Math.min(0, o + 1))} disabled={advMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] disabled:opacity-30">
+                <ChevronRight size={15} />
+              </button>
+            </div>
+            {filteredAdv.length === 0 && (
               <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
                 <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
               </div>
             )}
-              {s.advList.slice().reverse().map((a) => (
+            {filteredAdv.slice().reverse().map((a) => (
               <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
@@ -1812,7 +1835,8 @@ function EmployeeApp({
               </div>
             ))}
           </div>
-        )}
+          );
+        })()}
       </Shell>
     </>
   );
