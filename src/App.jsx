@@ -613,7 +613,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
             </div>
           </div>
         </div>
-                <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {s.remaining === 0 ? (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold" style={{ backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}>
               <Check size={11} /> To'liq to'landi
@@ -710,7 +710,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
               <div className="text-[var(--bad)] text-sm font-semibold font-mono tabular-nums">{fmt(s.totalAdvance)}</div>
               <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">{t("advance")}</div>
             </div>
-                        <div className="text-center">
+            <div className="text-center">
               {s.remaining === 0 ? (
                 <div className="flex items-center justify-center gap-1 text-[var(--warn)] text-sm font-semibold">
                   <Check size={13} />
@@ -1133,7 +1133,7 @@ function AdminApp({
     if (deltaX < 0 && idx < tabs.length - 1) setAdminTab(tabs[idx + 1].id);
     if (deltaX > 0 && idx > 0) setAdminTab(tabs[idx - 1].id);
   }
-  
+
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
   function exportReportToExcel() {
     const rows = myEmployees.map((emp) => {
@@ -1166,8 +1166,7 @@ function AdminApp({
     });
   })();
 
-  
- const bottomNav = (
+  const bottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
       <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
         {tabs.map((tab) => {
@@ -1278,7 +1277,7 @@ function AdminApp({
             </div>
           )}
 
-                   {myEmployees.length > 0 && (
+          {myEmployees.length > 0 && (
             <div className="relative">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
               <input
@@ -1337,7 +1336,7 @@ function AdminApp({
                   const isToday = d === todayISO();
                   const isSelected = d === attDate;
                   const isFuture = d > todayISO();
-                                    const dayEmployees = myEmployees.filter((emp) => employeeJoinDate(emp) <= d);
+                  const dayEmployees = myEmployees.filter((emp) => employeeJoinDate(emp) <= d);
                   const markedCount = dayEmployees.filter((emp) => attendance[emp.id]?.[d] !== undefined).length;
                   const dotColor = dayEmployees.length === 0 || isFuture
                     ? "transparent"
@@ -1380,7 +1379,7 @@ function AdminApp({
             </div>
           </div>
 
-                    {(() => {
+          {(() => {
             const visibleEmployees = myEmployees.filter((emp) => employeeJoinDate(emp) <= attDate);
             return (
               <>
@@ -1388,28 +1387,28 @@ function AdminApp({
             <div className="flex gap-1.5">
               <button
                 type="button"
-                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 1)}
+                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => e.id), 1)}
                 className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--good-soft)] text-[var(--good)] hover:opacity-80 transition-opacity"
               >
                 <CheckCircle2 size={13} /> {t("markAllFull")}
               </button>
               <button
                 type="button"
-                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 0.5)}
+                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => e.id), 0.5)}
                 className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--warn-soft)] text-[var(--warn)] hover:opacity-80 transition-opacity"
               >
                 <Calendar size={13} /> {t("markAllHalf")}
               </button>
               <button
                 type="button"
-                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => ({ id: e.id, wage: e.dailyWage })), 0)}
+                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => e.id), 0)}
                 className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--bad-soft)] text-[var(--bad)] hover:opacity-80 transition-opacity"
               >
                 <XCircle size={13} /> {t("markAllAbsent")}
               </button>
             </div>
           )}
-          
+
           <div className="space-y-2">
             {visibleEmployees.length === 0 && (
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
@@ -1461,7 +1460,7 @@ function AdminApp({
                   </div>
                 </div>
               );
-                        })}
+            })}
           </div>
               </>
             );
@@ -1541,7 +1540,7 @@ function AdminApp({
         </div>
       )}
 
-            {adminTab === "report" && (
+      {adminTab === "report" && (
         <div className="space-y-4">
           {(() => {
             const totalOwed = myEmployees.reduce((sum, emp) => {
@@ -1593,7 +1592,7 @@ function AdminApp({
                       <td className="py-2.5 px-5 text-[var(--text-primary)]">{emp.name}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmtDays(s.workedDays)}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmt(s.totalWage)}</td>
-                                            <td className="py-2.5 px-3 text-right text-[var(--bad)] font-mono tabular-nums">-{fmt(s.totalAdvance)}</td>
+                      <td className="py-2.5 px-3 text-right text-[var(--bad)] font-mono tabular-nums">-{fmt(s.totalAdvance)}</td>
                       <td className="py-2.5 px-3 text-right font-semibold font-mono tabular-nums">
                         {s.remaining === 0 ? (
                           <Check size={14} className="inline text-[var(--warn)]" />
@@ -1685,12 +1684,12 @@ function EmployeeApp({
   const attDays = Object.entries(s.att)
     .map(([date, raw]) => [date, attEntryStatus(raw), attEntryWage(raw, s.emp, date)])
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
-   const empTabs = [
+  const empTabs = [
     { id: "umumiy", label: "Umumiy", icon: <Home size={18} /> },
     { id: "davomat", label: "Davomat", icon: <Calendar size={18} /> },
     { id: "avanslar", label: "Avanslar", icon: <Wallet size={18} /> },
   ];
-    const empBottomNav = (
+  const empBottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
       <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
         {empTabs.map((tab) => {
@@ -1740,7 +1739,7 @@ function EmployeeApp({
         onTitleClick={() => setDrawerOpen(true)}
         bottomNav={empBottomNav}
       >
-                 {empTab === "umumiy" && (
+        {empTab === "umumiy" && (
           <div className="tab-transition space-y-3">
             <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm text-center">
               <div className="flex items-center justify-center gap-1.5 text-[var(--text-muted)] text-xs mb-1.5">
@@ -1760,7 +1759,7 @@ function EmployeeApp({
             </div>
           </div>
         )}
-                {empTab === "davomat" && (() => {
+        {empTab === "davomat" && (() => {
           const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
           const base = new Date();
           base.setDate(1);
@@ -1826,98 +1825,99 @@ function EmployeeApp({
             </div>
           );
         })()}
-      {empTab === "avanslar" && (() => {
-  const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
-  const monthNamesUz = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+        {empTab === "avanslar" && (() => {
+          const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
+          const monthNamesUz = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
 
-  const PAST_MONTHS = 24;
-  const FUTURE_MONTHS = 1;
-  const months = Array.from({ length: PAST_MONTHS + FUTURE_MONTHS + 1 }, (_, i) => {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - PAST_MONTHS + i);
-    const mIdx = d.getMonth();
-    const yy = d.getFullYear();
-    const name = localeTag === "uz-UZ" ? monthNamesUz[mIdx] : d.toLocaleDateString(localeTag, { month: "long" });
-    const label = (mIdx === 11 || mIdx === 0) ? `${yy} / ${name}` : name;
-    return { key: `${yy}-${String(mIdx + 1).padStart(2, "0")}`, label };
-  });
+          const PAST_MONTHS = 24;
+          const FUTURE_MONTHS = 1;
+          const months = Array.from({ length: PAST_MONTHS + FUTURE_MONTHS + 1 }, (_, i) => {
+            const d = new Date();
+            d.setDate(1);
+            d.setMonth(d.getMonth() - PAST_MONTHS + i);
+            const mIdx = d.getMonth();
+            const yy = d.getFullYear();
+            const name = localeTag === "uz-UZ" ? monthNamesUz[mIdx] : d.toLocaleDateString(localeTag, { month: "long" });
+            const label = (mIdx === 11 || mIdx === 0) ? `${yy} / ${name}` : name;
+            return { key: `${yy}-${String(mIdx + 1).padStart(2, "0")}`, label };
+          });
 
-  const filteredAdv = s.advList.filter((a) => a.date.startsWith(advMonthKey));
+          const filteredAdv = s.advList.filter((a) => a.date.startsWith(advMonthKey));
 
-  return (
-    <div className="space-y-3 tab-transition">
-      <div
-        ref={advScrollRef}
-        onScroll={handleAdvScroll}
-        className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5"
-        style={{ scrollbarWidth: "none", scrollSnapType: "x mandatory" }}
-      >
-        {months.map((m) => {
-          const active = advMonthKey === m.key;
           return (
-            <button
-              key={m.key}
-              ref={(el) => { advMonthRefs.current[m.key] = el; }}
-              type="button"
-              onClick={() => scrollAdvToMonth(m.key)}
-              className="flex items-center justify-center text-center capitalize rounded-lg"
-              style={{
-                scrollSnapAlign: "center",
-                flex: "0 0 calc((100% - 16px) / 3)",
-                height: active ? 52 : 40,
-                border: active ? `2px solid ${accent}` : "1px solid var(--border-input)",
-                color: active ? "var(--text-primary)" : "var(--text-faint)",
-                fontWeight: active ? 700 : 500,
-                fontSize: active ? 16 : 12,
-                backgroundColor: "var(--bg-card)",
-                opacity: active ? 1 : 0.45,
-                filter: active ? "none" : "blur(1.2px)",
-                transform: active ? "scale(1)" : "scale(0.86)",
-                transition: "opacity 0.25s ease, filter 0.25s ease, transform 0.25s ease, height 0.25s ease, font-size 0.25s ease, border-color 0.25s ease",
-              }}
-            >
-              {m.label}
-            </button>
-          );
-        })}
-      </div>
+            <div className="space-y-3 tab-transition">
+              <div
+                ref={advScrollRef}
+                onScroll={handleAdvScroll}
+                className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5"
+                style={{ scrollbarWidth: "none", scrollSnapType: "x mandatory" }}
+              >
+                {months.map((m) => {
+                  const active = advMonthKey === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      ref={(el) => { advMonthRefs.current[m.key] = el; }}
+                      type="button"
+                      onClick={() => scrollAdvToMonth(m.key)}
+                      className="flex items-center justify-center text-center capitalize rounded-lg"
+                      style={{
+                        scrollSnapAlign: "center",
+                        flex: "0 0 calc((100% - 16px) / 3)",
+                        height: active ? 52 : 40,
+                        border: active ? `2px solid ${accent}` : "1px solid var(--border-input)",
+                        color: active ? "var(--text-primary)" : "var(--text-faint)",
+                        fontWeight: active ? 700 : 500,
+                        fontSize: active ? 16 : 12,
+                        backgroundColor: "var(--bg-card)",
+                        opacity: active ? 1 : 0.45,
+                        filter: active ? "none" : "blur(1.2px)",
+                        transform: active ? "scale(1)" : "scale(0.86)",
+                        transition: "opacity 0.25s ease, filter 0.25s ease, transform 0.25s ease, height 0.25s ease, font-size 0.25s ease, border-color 0.25s ease",
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-      {filteredAdv.length === 0 && (
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
-          <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
-        </div>
-      )}
-      {filteredAdv.slice().reverse().map((a) => (
-        <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-            style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-          >
-            {a.type === "salary" ? <Wallet size={14} /> : <TrendingDown size={14} />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
-            <span
-              className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full inline-block mr-1.5"
-              style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-            >
-              {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
-            </span>
-            <span className="text-[var(--text-muted)] text-xs">{a.date}</span>
-          </div>
-          {a.note && (
-            <div className="text-[var(--text-primary)] text-sm font-bold text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-})()}
+              {filteredAdv.length === 0 && (
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
+                  <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
+                </div>
+              )}
+              {filteredAdv.slice().reverse().map((a) => (
+                <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                    style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                  >
+                    {a.type === "salary" ? <Wallet size={14} /> : <TrendingDown size={14} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums mb-1">{fmt(a.amount)}</div>
+                    <span
+                      className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full inline-block mr-1.5"
+                      style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+                    >
+                      {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+                    </span>
+                    <span className="text-[var(--text-muted)] text-xs">{a.date}</span>
+                  </div>
+                  {a.note && (
+                    <div className="text-[var(--text-primary)] text-sm font-bold text-right shrink-0 max-w-[38%] truncate">{a.note}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </Shell>
     </>
   );
 }
+
 export default function WorkforceApp() {
   const [loading, setLoading] = useState(true);
   const [usersData, setUsersData] = useState(null);
@@ -1950,7 +1950,7 @@ export default function WorkforceApp() {
   const [advForm, setAdvForm] = useState({ amount: "", date: todayISO(), note: "", type: "avans" });
   const [notifications, setNotifications] = useState([]);
   const [accent, setAccent] = useState(ACCENT_PRESETS[2].value);
- const [mode, setMode] = useState(() => {
+  const [mode, setMode] = useState(() => {
     try {
       return localStorage.getItem("app-mode") || "dark";
     } catch (e) {
@@ -2222,10 +2222,15 @@ export default function WorkforceApp() {
     await persistAttendance({ ...attendance, [empId]: dayMap });
   }
 
-  async function bulkMarkAttendance(empList, status) {
+  // Ommaviy belgilash: har bir ishchi uchun wage history'dan (o'sha kunga mos)
+  // stavkani oladi — hozirgi (joriy) stavka emas, shu tufayli stavka o'zgargan
+  // bo'lsa ham eski kunlar to'g'ri hisoblanadi.
+  async function bulkMarkAttendance(empIds, status) {
     if (attDate > todayISO()) return;
     const updated = { ...attendance };
-    empList.forEach(({ id, wage }) => {
+    empIds.forEach((id) => {
+      const emp = usersData.employees.find((e) => e.id === id);
+      const wage = emp ? wageForDate(emp, attDate) : 0;
       const dayMap = { ...(updated[id] || {}) };
       dayMap[attDate] = { v: status, wage: Number(wage || 0) };
       updated[id] = dayMap;
