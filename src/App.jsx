@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext } from "react";
+import { useState, useEffect, useRef, createContext, useContext, Component } from "react";
 import {
   Users, Calendar, Wallet, LogOut, Plus, Trash2, CheckCircle2,
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
@@ -10,7 +10,16 @@ import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
 import confetti from "canvas-confetti";
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// FIX: avvalgi versiya new Date().toISOString() orqali UTC sanasini olardi.
+// O'zbekiston UTC+5 da, shu sabab tungi soat 00:00–05:00 orasida (mahalliy vaqt)
+// "bugungi sana" noto'g'ri — aslida kechagi kun qaytardi. Endi mahalliy vaqt asosida hisoblaymiz.
+const todayISO = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 const fmt = (n) => Number(n || 0).toLocaleString("uz-UZ") + " so'm";
 const fmtDays = (n) => {
   const r = Math.round(Number(n || 0) * 10) / 10;
@@ -244,6 +253,43 @@ function urlBase64ToUint8Array(base64String) {
   const outputArray = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
+}
+
+// FIX: yangi qo'shildi — avval Error Boundary umuman yo'q edi, shu sabab har
+// qanday kutilmagan JS xatosi (masalan null obyektdan xususiyat o'qishga urinish)
+// butun ilovani oq ekranga aylantirib qo'yardi. Endi shunday xato yuz bersa,
+// foydalanuvchi tushunarli xabar va "Qayta yuklash" tugmasini ko'radi.
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    console.error("Ilovada kutilmagan xato:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "#101317", color: "#edeff2", padding: 24, textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>Kutilmagan xato yuz berdi</div>
+          <div style={{ fontSize: 13, color: "#8d97a3", maxWidth: 320 }}>
+            Ilova ishlashda muammo yuz berdi. Sahifani qayta yuklab ko'ring.
+          </div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{ padding: "10px 20px", borderRadius: 8, background: "#4d84d9", color: "#12161c", fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}
+          >
+            Qayta yuklash
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 const memoryStore = {};
@@ -836,6 +882,11 @@ function ProfileDrawer({
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [confirmDeleteAcc, setConfirmDeleteAcc] = useState(false);
+  // FIX: yangi qo'shildi — avval akkauntni o'chirish tugmasi hech qanday parol
+  // so'ramasdan ishlar edi. Umumiy kompyuterda seans ochiq qolgan bo'lsa,
+  // boshqa kishi ikkita tugma bosib akkauntni butunlay o'chirib yuborishi mumkin edi.
+  const [deletePwInput, setDeletePwInput] = useState("");
+  const [deletePwError, setDeletePwError] = useState("");
 
   useEffect(() => {
     if (!open) setPage(null);
@@ -1067,17 +1118,28 @@ function ProfileDrawer({
                 <p className="text-[var(--bad)] text-xs mb-2.5">
                   {isAdmin ? t("confirmDeleteAccountAdmin") : t("confirmDeleteAccountEmployee")}
                 </p>
+                {/* FIX: yangi qo'shildi — o'chirishdan oldin joriy parol tasdiqlanadi */}
+                <div className="mb-2.5">
+                  <Field label={t("currentPassword")} type="password" value={deletePwInput} onChange={setDeletePwInput} />
+                  {deletePwError && <p className="text-[var(--bad)] text-xs mt-1.5">{deletePwError}</p>}
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={onDeleteAccount}
+                    onClick={() => {
+                      if (deletePwInput !== me.password) {
+                        setDeletePwError(t("errWrongCurrentPassword"));
+                        return;
+                      }
+                      onDeleteAccount();
+                    }}
                     className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
                   >
                     {t("yesDeleteAccount")}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setConfirmDeleteAcc(false)}
+                    onClick={() => { setConfirmDeleteAcc(false); setDeletePwInput(""); setDeletePwError(""); }}
                     className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
                   >
                     {t("cancel")}
@@ -1162,7 +1224,8 @@ function AdminApp({
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      return d.toISOString().slice(0, 10);
+      // FIX: toISOString() UTC beradi — mahalliy sana bilan bir kunlik farq bo'lishi mumkin edi.
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     });
   })();
 
@@ -1919,7 +1982,16 @@ function EmployeeApp({
 }
 
 export default function WorkforceApp() {
+  return (
+    <AppErrorBoundary>
+      <WorkforceAppInner />
+    </AppErrorBoundary>
+  );
+}
+
+function WorkforceAppInner() {
   const [loading, setLoading] = useState(true);
+  const [initTimedOut, setInitTimedOut] = useState(false); // FIX: yangi holat — init() cho'zilib ketsa oq ekran o'rniga xabar ko'rsatish uchun
   const [usersData, setUsersData] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [advances, setAdvances] = useState({});
@@ -1941,6 +2013,13 @@ export default function WorkforceApp() {
   }
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
+  // FIX: yangi qo'shildi — avval login urinishlariga hech qanday cheklov yo'q edi,
+  // shu sabab brute-force (parolni "sinab ko'rish") hujumidan himoya bo'lmagan.
+  // Bu FAQAT frontend darajasidagi yumshoq to'siq — asosiy himoya Supabase/backend
+  // tomonida (masalan Supabase Auth yoki rate-limit funksiyasi) bo'lishi kerak,
+  // buni Supabase qismini birga sozlayotganimizda ko'rib chiqamiz.
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(0);
 
   const [adminTab, setAdminTab] = useState("employees");
   const [newEmp, setNewEmp] = useState({ name: "", username: "", password: "", dailyWage: "" });
@@ -1962,7 +2041,17 @@ export default function WorkforceApp() {
 
   useEffect(() => {
     init();
-    const timer = setTimeout(() => setLoading(false), 4000);
+    // FIX: avvalgi versiyada 4 soniyadan keyin usersData hali null bo'lsa ham
+    // majburan loading=false qilib qo'yardi. Agar internet sekin bo'lsa yoki
+    // init() biror sababdan hali tugamagan bo'lsa, keyingi render'da
+    // usersData.admins[...] kabi joylarda "Cannot read properties of null"
+    // xatosi bilan butun ilova oq ekran bo'lib qolardi.
+    // Endi: agar shu muddatda usersData hali kelmagan bo'lsa, loading emas,
+    // initTimedOut holatiga o'tamiz — foydalanuvchiga aniq xabar va
+    // "qayta urinish" tugmasi ko'rsatiladi, ilova esa qulamaydi.
+    const timer = setTimeout(() => {
+      setInitTimedOut(true);
+    }, 8000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -2027,6 +2116,7 @@ export default function WorkforceApp() {
   }, [currentUser]);
 
   async function init() {
+    setInitTimedOut(false); // FIX: qayta urinishda eski xato holatini tozalaymiz
     let usersVal = null;
     try {
       const raw = await safeGet("users-data");
@@ -2094,6 +2184,16 @@ export default function WorkforceApp() {
 
   function handleLogin(asAdmin) {
     setLoginError("");
+    // FIX: agar oldingi urinishlar tufayli hozir bloklangan bo'lsak, urinishni to'xtatamiz.
+    if (Date.now() < lockedUntil) {
+      const secsLeft = Math.ceil((lockedUntil - Date.now()) / 1000);
+      setLoginError(
+        lang === "ru" ? `Слишком много попыток. Подождите ${secsLeft} сек.` :
+        lang === "en" ? `Too many attempts. Wait ${secsLeft}s.` :
+        `Juda ko'p urinish. ${secsLeft} soniya kuting.`
+      );
+      return;
+    }
     try {
       const username = loginForm.username.trim();
       const password = loginForm.password;
@@ -2102,16 +2202,28 @@ export default function WorkforceApp() {
 
       if (asAdmin) {
         if (admins[username] && admins[username].password === password) {
+          setFailedAttempts(0); // FIX: muvaffaqiyatli kirishda hisoblagichni tozalaymiz
           setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username });
           return;
         }
       } else {
         const emp = employees.find((x) => x.username === username && x.password === password);
         if (emp) {
+          setFailedAttempts(0); // FIX: muvaffaqiyatli kirishda hisoblagichni tozalaymiz
           setCurrentUser({ role: "employee", id: emp.id, name: emp.name, owner: emp.owner });
           return;
         }
       }
+      // FIX: noto'g'ri urinishni hisoblaymiz — 5 marta ketma-ket xato bo'lsa,
+      // 30 soniyaga bloklaymiz (oddiy frontend darajasidagi cheklov).
+      setFailedAttempts((prev) => {
+        const next = prev + 1;
+        if (next >= 5) {
+          setLockedUntil(Date.now() + 30000);
+          return 0;
+        }
+        return next;
+      });
       setLoginError(makeT(lang)("wrongLogin"));
     } catch (err) {
       setLoginError(String(err && err.message ? err.message : err));
@@ -2239,9 +2351,15 @@ export default function WorkforceApp() {
   }
 
   async function addAdvance() {
-    if (!advEmp || !advForm.amount) return;
+    // FIX: avvalgi tekshiruv `!advForm.amount` edi — bu "0" satrini ham
+    // "bo'sh" deb hisoblamas edi (chunki "0" == false emas, lekin bo'sh
+    // satr ""ni tekshirish kifoya emas edi), shu sabab summasi 0 bo'lgan
+    // avans ham ro'yxatga qo'shilib ketishi mumkin edi. Endi aniq son va
+    // 0 dan katta ekanini tekshiramiz.
+    const amountNum = Number(advForm.amount);
+    if (!advEmp || !advForm.amount || !Number.isFinite(amountNum) || amountNum <= 0) return;
     const list = advances[advEmp] ? [...advances[advEmp]] : [];
-    list.push({ id: "a" + Date.now(), amount: Number(advForm.amount), date: advForm.date, note: advForm.note, type: advForm.type || "avans" });
+    list.push({ id: "a" + Date.now(), amount: amountNum, date: advForm.date, note: advForm.note, type: advForm.type || "avans" });
     await persistAdvances({ ...advances, [advEmp]: list });
     setAdvForm({ amount: "", date: todayISO(), note: "", type: advForm.type || "avans" });
   }
@@ -2328,10 +2446,20 @@ export default function WorkforceApp() {
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
       }
-      await supabase.from("push_subscriptions").insert({
-        admin_username: currentUser.username,
-        subscription: sub.toJSON(),
-      });
+      // FIX: avval har safar "enableNotifications" bosilganda `insert` qilinar edi —
+      // shu sabab bitta foydalanuvchi uchun bir nechta takroriy obuna yig'ilib qolardi.
+      // Endi endpoint bo'yicha upsert qilinadi (Supabase tomonda push_subscriptions
+      // jadvalida subscription->>'endpoint' ustuniga unique index/constraint kerak bo'ladi —
+      // buni Supabase qismini birga qilayotganimizda sozlaymiz).
+      const subJson = sub.toJSON();
+      await supabase.from("push_subscriptions").upsert(
+        {
+          admin_username: currentUser.username,
+          subscription: subJson,
+          endpoint: subJson.endpoint,
+        },
+        { onConflict: "endpoint" }
+      );
       alert("Bildirishnoma yoqildi!");
     } catch (e) {
       console.error(e);
@@ -2352,7 +2480,35 @@ export default function WorkforceApp() {
   const t = makeT(lang);
 
   let screen;
-  if (loading) {
+  // FIX: usersData hali null bo'lsa (masalan tarmoq sekin bo'lgani uchun init()
+  // hali tugamagan), currentUser mavjud bo'lsa ham AdminApp/EmployeeApp'ni
+  // render qilmaymiz — aks holda usersData.admins[...] kabi joylarda
+  // "Cannot read properties of null" xatosi bilan ilova qulab tushardi.
+  if (!usersData && initTimedOut) {
+    // FIX: yangi holat — internet/serverga ulanib bo'lmadi, foydalanuvchiga
+    // aniq xabar va qayta urinish imkoni beriladi (oq ekran o'rniga).
+    screen = (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-app)] px-6 text-center">
+        <img src="/logo.svg" alt={t("appName")} className="w-14 h-14 opacity-60" />
+        <div className="text-[var(--text-primary)] font-semibold text-base">
+          {lang === "ru" ? "Не удалось загрузить данные" : lang === "en" ? "Failed to load data" : "Ma'lumotlarni yuklab bo'lmadi"}
+        </div>
+        <div className="text-[var(--text-muted)] text-xs max-w-xs">
+          {lang === "ru" ? "Проверьте подключение к интернету и попробуйте снова." : lang === "en" ? "Check your internet connection and try again." : "Internet aloqasini tekshirib, qayta urinib ko'ring."}
+        </div>
+        <button
+          type="button"
+          onClick={() => { setLoading(true); setInitTimedOut(false); init(); }}
+          className="mt-2 px-5 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold hover:opacity-90 transition-opacity"
+          style={{ backgroundColor: accent }}
+        >
+          {lang === "ru" ? "Повторить" : lang === "en" ? "Retry" : "Qayta urinish"}
+        </button>
+      </div>
+    );
+  } else if (loading || !usersData) {
+    // FIX: hali usersData tayyor bo'lmagan bo'lsa (init() davom etyapti),
+    // currentUser mavjud bo'lsa ham Admin/EmployeeApp render qilinmaydi.
     screen = (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-app)]">
         <img src="/logo.svg" alt={t("appName")} className="w-16 h-16 animate-pulse" />
