@@ -225,24 +225,24 @@ const PALETTES = {
     "--bg-card": "#181c22",
     "--bg-panel": "#13161b",
     "--border": "#242a32",
-    "--border-input": "#2a313a",
+    "--border-input": "#333b45",
     "--border-soft": "#1c2129",
     "--text-primary": "#edeff2",
     "--text-secondary": "#8d97a3",
     "--text-muted": "#69727e",
-    "--text-faint": "#4a525e",
+    "--text-faint": "#5b6470",
   },
   light: {
     "--bg-app": "#eef0f3",
     "--bg-card": "#ffffff",
     "--bg-panel": "#ffffff",
     "--border": "#e0e3e8",
-    "--border-input": "#d2d7de",
+    "--border-input": "#c5cbd4",
     "--border-soft": "#e9ecf0",
     "--text-primary": "#181c22",
     "--text-secondary": "#565f6b",
-    "--text-muted": "#7c8592",
-    "--text-faint": "#9aa2ac",
+    "--text-muted": "#707886",
+    "--text-faint": "#78808c",
   },
 };
 
@@ -2700,6 +2700,16 @@ function WorkforceAppInner() {
             to { opacity: 1; transform: translateY(0); }
           }
           .tab-transition { animation: fadeSlideIn 0.28s ease-out; }
+
+          button:focus-visible,
+          input:focus-visible,
+          select:focus-visible,
+          a:focus-visible,
+          [tabindex]:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: 6px;
+          }
         `}</style>
         {screen}
       </div>
