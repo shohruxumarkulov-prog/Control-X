@@ -1469,32 +1469,64 @@ function AdminApp({
             const visibleEmployees = myEmployees.filter((emp) => employeeJoinDate(emp) <= attDate);
             return (
               <>
-          {visibleEmployees.length > 0 && attDate <= todayISO() && (
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => e.id), 1)}
-                className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--good-soft)] text-[var(--good)] hover:opacity-80 transition-opacity"
-              >
-                <CheckCircle2 size={13} /> {t("markAllFull")}
-              </button>
-              <button
-                type="button"
-                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => e.id), 0.5)}
-                className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--warn-soft)] text-[var(--warn)] hover:opacity-80 transition-opacity"
-              >
-                <Calendar size={13} /> {t("markAllHalf")}
-              </button>
-              <button
-                type="button"
-                onClick={() => bulkMarkAttendance(visibleEmployees.map((e) => e.id), 0)}
-                className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-[var(--bad-soft)] text-[var(--bad)] hover:opacity-80 transition-opacity"
-              >
-                <XCircle size={13} /> {t("markAllAbsent")}
-              </button>
-            </div>
-          )}
+           {visibleEmployees.length > 0 && attDate <= todayISO() && (
+            <>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPendingBulk({ status: 1, label: t("markAllFull"), icon: <CheckCircle2 size={13} />, tone: "good" })}
+                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium border border-[var(--good)]/40 text-[var(--good)] bg-transparent hover:bg-[var(--good-soft)] transition-colors"
+                >
+                  <CheckCircle2 size={13} /> {t("markAllFull")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingBulk({ status: 0.5, label: t("markAllHalf"), icon: <Calendar size={13} />, tone: "warn" })}
+                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium border border-[var(--warn)]/40 text-[var(--warn)] bg-transparent hover:bg-[var(--warn-soft)] transition-colors"
+                >
+                  <Calendar size={13} /> {t("markAllHalf")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingBulk({ status: 0, label: t("markAllAbsent"), icon: <XCircle size={13} />, tone: "bad" })}
+                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium border border-[var(--bad)]/40 text-[var(--bad)] bg-transparent hover:bg-[var(--bad-soft)] transition-colors"
+                >
+                  <XCircle size={13} /> {t("markAllAbsent")}
+                </button>
+              </div>
 
+              {pendingBulk && (
+                <div
+                  className="flex items-center justify-between gap-3 rounded-lg p-3 mt-1.5"
+                  style={{
+                    backgroundColor: `var(--${pendingBulk.tone}-soft)`,
+                    border: `1px solid var(--${pendingBulk.tone})`,
+                  }}
+                >
+                  <span className="text-xs font-medium flex items-center gap-1.5" style={{ color: `var(--${pendingBulk.tone})` }}>
+                    {pendingBulk.icon} {visibleEmployees.length} ta ishchiga "{pendingBulk.label}" qo'llansinmi?
+                  </span>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => { bulkMarkAttendance(visibleEmployees.map((e) => e.id), pendingBulk.status); setPendingBulk(null); }}
+                      className="px-3 py-1.5 rounded-md text-white text-[11px] font-semibold"
+                      style={{ backgroundColor: `var(--${pendingBulk.tone})` }}
+                    >
+                      {t("yesDelete").replace(", o'chirish", "")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingBulk(null)}
+                      className="px-3 py-1.5 rounded-md bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-[11px] font-medium"
+                    >
+                      {t("cancel")}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <div className="space-y-2">
             {visibleEmployees.length === 0 && (
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
