@@ -190,7 +190,7 @@ const STR = {
   notifications: { uz: "Bildirishnomalar", ru: "Уведомления", en: "Notifications" },
   noNotifications: { uz: "Hali bildirishnoma yo'q", ru: "Уведомлений пока нет", en: "No notifications yet" },
   markAllRead: { uz: "Hammasini o'qilgan deb belgilash", ru: "Отметить все как прочитанные", en: "Mark all as read" },
-  advanced: { uz: "Kengaytirilgan", ru: "Дополнительно", en: "Advanced" },
+  advanced: { uz: "Akkaunt boshqaruvi", ru: "Управление аккаунтом", en: "Account management" },
 };
 
 function makeT(lang) {
@@ -910,6 +910,15 @@ function ProfileDrawer({
 
   const PAGE_TITLES = { appearance: t("appearance"), privacy: t("privacySecurity"), credentials: t("updateCredentials"), language: t("language"), advanced: t("advanced") };
   const PARENT_PAGE = { credentials: "privacy" };
+  const breadcrumbTrail = (() => {
+  const trail = [];
+    let cur = page;
+    while (cur) {
+      trail.unshift(cur);
+      cur = PARENT_PAGE[cur];
+    }
+    return trail;
+  })();
 
   async function handleFile(e) {
     const file = e.target.files && e.target.files[0];
@@ -983,6 +992,34 @@ function ProfileDrawer({
           </button>
         </div>
 
+                {page && (
+          <div className="flex items-center gap-1 px-5 pt-2.5 pb-1 text-[11px] flex-wrap">
+            <button
+              type="button"
+              onClick={() => setPage(null)}
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              {t("profile")}
+            </button>
+            {breadcrumbTrail.map((p, i) => {
+              const isLast = i === breadcrumbTrail.length - 1;
+              return (
+                <span key={p} className="flex items-center gap-1">
+                  <ChevronRight size={11} className="text-[var(--text-faint)]" />
+                  <button
+                    type="button"
+                    onClick={() => !isLast && setPage(p)}
+                    disabled={isLast}
+                    className={isLast ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"}
+                  >
+                    {PAGE_TITLES[p]}
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
         {!page && (
           <>
             <div className="px-5 pt-5">
@@ -1012,7 +1049,7 @@ function ProfileDrawer({
               <MenuRow icon={<Paintbrush size={18} className="text-[var(--accent)]" />} label={t("appearance")} onClick={() => setPage("appearance")} />
               <MenuRow icon={<ShieldCheck size={18} className="text-[var(--good)]" />} label={t("privacySecurity")} onClick={() => setPage("privacy")} />
               <MenuRow icon={<Globe size={18} className="text-[var(--accent)]" />} label={t("language")} onClick={() => setPage("language")} />
-              <MenuRow icon={<Settings size={18} className="text-[var(--text-secondary)]" />} label={t("advanced")} onClick={() => setPage("advanced")} />
+              <MenuRow icon={<UserX size={18} className="text-[var(--bad)]" />} label={t("advanced")} onClick={() => setPage("advanced")} />
               <MenuRow icon={<LogOut size={18} className="text-[var(--bad)]" />} label={t("logout")} onClick={onLogout} danger />
             </div>
             <div className="h-5" />
