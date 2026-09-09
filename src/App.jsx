@@ -1230,6 +1230,7 @@ function AdminApp({
     XLSX.writeFile(wb, `hisobot-${todayISO()}.xlsx`);
   }
   const [weekOffset, setWeekOffset] = useState(0);
+  const [pendingBulk, setPendingBulk] = useState(null); // { status, label } yoki null
   const dateStrip = (() => {
     const today = new Date();
     const day = today.getDay();
@@ -1416,10 +1417,11 @@ function AdminApp({
                   const isFuture = d > todayISO();
                   const dayEmployees = myEmployees.filter((emp) => employeeJoinDate(emp) <= d);
                   const markedCount = dayEmployees.filter((emp) => attendance[emp.id]?.[d] !== undefined).length;
-                  const dotColor = dayEmployees.length === 0 || isFuture
+                  const hasData = dayEmployees.length > 0 && !isFuture;
+                  const dotColor = !hasData
                     ? "transparent"
                     : markedCount === 0
-                      ? "var(--border-input)"
+                      ? "var(--bad)"
                       : markedCount < dayEmployees.length
                         ? "var(--warn)"
                         : "var(--good)";
@@ -1441,7 +1443,13 @@ function AdminApp({
                     >
                       <span className="text-[10px] opacity-80 capitalize">{weekday}</span>
                       <span className="text-sm font-semibold">{dt.getDate()}</span>
-                      <span className="w-1.5 h-1.5 rounded-full mt-1" style={{ backgroundColor: dotColor }} />
+                      <span
+                        className="w-2 h-2 rounded-full mt-1"
+                        style={{
+                          backgroundColor: dotColor,
+                          border: hasData && markedCount === 0 ? "none" : "1px solid rgba(0,0,0,0.08)",
+                        }}
+                      />
                     </button>
                   );
                 })}
