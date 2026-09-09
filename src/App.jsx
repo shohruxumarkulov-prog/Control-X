@@ -170,6 +170,8 @@ const STR = {
   adminLoginTitle: { uz: "Boshqaruvchi kirishi", ru: "Вход руководителя", en: "Manager sign in" },
   employeeLoginTitle: { uz: "Ishchi kirishi", ru: "Вход сотрудника", en: "Employee sign in" },
   registerTitle: { uz: "Yangi boshqaruvchi yaratish", ru: "Создать нового руководителя", en: "Create a new manager account" },
+  roleTabEmployee: { uz: "Ishchi", ru: "Сотрудник", en: "Employee" },
+  roleTabAdmin: { uz: "Boshqaruvchi", ru: "Руководитель", en: "Manager" },
   registerSubtitle: { uz: "O'z login-parolingizni o'ylab toping va o'z ishchilaringizni boshqaring", ru: "Придумайте свой логин и пароль и управляйте своими сотрудниками", en: "Choose your own username and password to manage your own employees" },
   chooseLogin: { uz: "Login o'ylab toping", ru: "Придумайте логин", en: "Choose a username" },
   choosePassword: { uz: "Parol o'ylab toping", ru: "Придумайте пароль", en: "Choose a password" },
@@ -507,77 +509,90 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2 justify-center mb-8">
-          <img src="/logo.svg" alt={t("appName")} className="w-9 h-9" />
-          <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
-        </div>
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7 shadow-lg">
-          <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1 tracking-tight">
-            {asAdmin ? t("adminLoginTitle") : t("employeeLoginTitle")}
-          </h1>
-          <p className="text-[var(--text-muted)] text-sm mb-6">{t("loginSubtitle")}</p>
-          <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("login")}</label>
-          <input
-            className="w-full mb-4 px-3.5 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
-            value={loginForm.username}
-            onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
-            autoFocus
-          />
-          <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("password")}</label>
-          <div className="relative mb-2">
-            <input
-              type={showPassword ? "text" : "password"}
-              className="w-full px-3.5 py-2.5 pr-10 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
-              value={loginForm.password}
-              onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-0 top-0 h-full px-3 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-            >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          {loginError && <p className="text-[var(--bad)] text-xs mb-2 mt-1">{loginError}</p>}
-          <button type="button" onClick={() => onSubmit(asAdmin)} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
-            {t("loginBtn")}
-          </button>
+  <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
+    <div className="w-full max-w-sm">
+      <div className="flex items-center gap-2 justify-center mb-8">
+        <img src="/logo.svg" alt={t("appName")} className="w-9 h-9" />
+        <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
+      </div>
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7 shadow-lg">
 
-          {asAdmin ? (
-            <>
-              <button
-                type="button"
-                onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
-                className="w-full mt-3 py-2.5 rounded-lg border border-dashed border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition-colors flex items-center justify-center gap-1.5"
-              >
-                <UserPlus size={13} /> {t("registerTitle")}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAsAdmin(false); setLoginForm({ username: "", password: "" }); }}
-                className="w-full mt-2 py-2 rounded-lg text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
-              >
-                {t("backToEmployeeLogin")}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => { setAsAdmin(true); setLoginForm({ username: "", password: "" }); }}
-              className="w-full mt-3 py-2.5 rounded-lg border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-colors flex items-center justify-center gap-1.5"
-            >
-              <ShieldCheck size={13} /> {t("enterAsAdmin")}
-            </button>
-          )}
+        {/* YANGI: rol tanlash segment-kontrol */}
+        <div className="flex bg-[var(--bg-app)] border border-[var(--border-input)] rounded-full p-1 mb-6">
+          <button
+            type="button"
+            onClick={() => { setAsAdmin(false); setLoginForm({ username: "", password: "" }); setLoginError(""); }}
+            className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
+            style={
+              !asAdmin
+                ? { backgroundColor: accent, color: "#12161c" }
+                : { color: "var(--text-secondary)" }
+            }
+          >
+            {t("roleTabEmployee")}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAsAdmin(true); setLoginForm({ username: "", password: "" }); setLoginError(""); }}
+            className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
+            style={
+              asAdmin
+                ? { backgroundColor: accent, color: "#12161c" }
+                : { color: "var(--text-secondary)" }
+            }
+          >
+            {t("roleTabAdmin")}
+          </button>
         </div>
+
+        <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1 tracking-tight">
+          {asAdmin ? t("adminLoginTitle") : t("employeeLoginTitle")}
+        </h1>
+        <p className="text-[var(--text-muted)] text-sm mb-6">{t("loginSubtitle")}</p>
+        <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("login")}</label>
+        <input
+          className="w-full mb-4 px-3.5 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
+          value={loginForm.username}
+          onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
+          autoFocus
+        />
+        <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("password")}</label>
+        <div className="relative mb-2">
+          <input
+            type={showPassword ? "text" : "password"}
+            className="w-full px-3.5 py-2.5 pr-10 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
+            value={loginForm.password}
+            onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-0 top-0 h-full px-3 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
+        {loginError && <p className="text-[var(--bad)] text-xs mb-2 mt-1">{loginError}</p>}
+        <button type="button" onClick={() => onSubmit(asAdmin)} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
+          {t("loginBtn")}
+        </button>
+
+        {/* Faqat "Boshqaruvchi" rejimida ro'yxatdan o'tish tugmasi qoladi */}
+        {asAdmin && (
+          <button
+            type="button"
+            onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
+            className="w-full mt-3 py-2.5 rounded-lg border border-dashed border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition-colors flex items-center justify-center gap-1.5"
+          >
+            <UserPlus size={13} /> {t("registerTitle")}
+          </button>
+        )}
       </div>
     </div>
-  );
+  </div>
+);
 }
 
 function CopyButton({ text }) {
