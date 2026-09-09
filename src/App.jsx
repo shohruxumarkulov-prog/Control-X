@@ -93,6 +93,7 @@ const STR = {
   deleteEmployee: { uz: "Ishchini o'chirish", ru: "Удалить сотрудника", en: "Delete employee" },
   confirmDelete: { uz: "Rostdan ham {name}ni o'chirmoqchimisiz? Davomat va avans tarixi ham butunlay o'chib ketadi.", ru: "Точно удалить {name}? История посещаемости и авансов тоже удалится.", en: "Really delete {name}? Attendance and advance history will be deleted too." },
   yesDelete: { uz: "Ha, o'chirish", ru: "Да, удалить", en: "Yes, delete" },
+  yesConfirm: { uz: "Ha, qo'llash", ru: "Да, применить", en: "Yes, apply" },
   cancel: { uz: "Bekor qilish", ru: "Отмена", en: "Cancel" },
   markAttendanceHeader: { uz: "Davomatni belgilash", ru: "Отметить посещаемость", en: "Mark attendance" },
   selectPlaceholder: { uz: "Tanlang...", ru: "Выберите...", en: "Select..." },
@@ -1513,7 +1514,7 @@ function AdminApp({
                       className="px-3 py-1.5 rounded-md text-white text-[11px] font-semibold"
                       style={{ backgroundColor: `var(--${pendingBulk.tone})` }}
                     >
-                      {t("yesDelete").replace(", o'chirish", "")}
+                      {t("yesConfirm")}
                     </button>
                     <button
                       type="button"
