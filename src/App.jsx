@@ -2747,7 +2747,6 @@ function WorkforceAppInner() {
           .tab-transition { animation: fadeSlideIn 0.28s ease-out; }
 
           button:focus-visible,
-          input:focus-visible,
           select:focus-visible,
           a:focus-visible,
           [tabindex]:focus-visible {
