@@ -717,23 +717,6 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
             <CopyButton text={emp.username} />
           </div>
 
-          <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg px-3 py-2">
-            <div className="min-w-0">
-              <div className="text-[10px] text-[var(--text-muted)]">{t("password")}</div>
-              <div className="text-[var(--text-primary)] text-sm truncate">{reveal ? emp.password : "•".repeat(Math.max(emp.password.length, 6))}</div>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setReveal((v) => !v)}
-                className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-              <CopyButton text={emp.password} />
-            </div>
-          </div>
-
           <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1 mt-1">
             <Wallet size={12} /> {t("dailyWage")}
           </div>
