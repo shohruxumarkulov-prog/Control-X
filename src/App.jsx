@@ -62,6 +62,7 @@ const LANGS = [
 const STR = {
   appName: { uz: "Nazorat+", ru: "Nazorat+", en: "Nazorat+" },
   loginTitle: { uz: "Tizimga kirish", ru: "Вход в систему", en: "Sign in" },
+  loginHeading: { uz: "Kirish", ru: "Вход", en: "Login" },
   loginSubtitle: { uz: "Login va parolingizni kiriting", ru: "Введите логин и пароль", en: "Enter your login and password" },
   login: { uz: "Login", ru: "Логин", en: "Username" },
   password: { uz: "Parol", ru: "Пароль", en: "Password" },
@@ -191,6 +192,11 @@ const STR = {
   noNotifications: { uz: "Hali bildirishnoma yo'q", ru: "Уведомлений пока нет", en: "No notifications yet" },
   markAllRead: { uz: "Hammasini o'qilgan deb belgilash", ru: "Отметить все как прочитанные", en: "Mark all as read" },
   advanced: { uz: "Akkaunt boshqaruvi", ru: "Управление аккаунтом", en: "Account management" },
+  rememberMe: { uz: "Meni eslab qol", ru: "Запомнить меня", en: "Remember me" },
+  forgotPassword: { uz: "Parolni unutdingizmi?", ru: "Забыли пароль?", en: "Forgot password?" },
+  forgotPasswordHint: { uz: "Parolni faqat boshqaruvchi tiklashi mumkin. Iltimos, boshqaruvchingizga murojaat qiling.", ru: "Пароль может восстановить только руководитель. Пожалуйста, обратитесь к нему.", en: "Only your manager can reset your password. Please contact them." },
+  noAccountYet: { uz: "Hisobingiz yo'qmi?", ru: "Нет аккаунта?", en: "Don't have an account?" },
+  signUpLink: { uz: "Ro'yxatdan o'tish", ru: "Регистрация", en: "Sign up" },
 };
 
 function makeT(lang) {
@@ -372,6 +378,54 @@ function Field({ label, value, onChange, type = "text" }) {
   );
 }
 
+// YANGI: rasmga o'xshab, dumaloq (pill) ko'rinishdagi, ichida ikonka bo'lgan input.
+// Login ekranida foydalaniladi — label yo'q, o'rniga placeholder ishlatiladi.
+function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDown, autoFocus, showToggle, toggleIcon, onToggle }) {
+  return (
+    <div className="relative">
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">
+        {icon}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-full bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text-muted)]`}
+      />
+      {showToggle && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          {toggleIcon}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// YANGI: "Meni eslab qol" uchun kichik dumaloq svitch (toggle).
+function ToggleSwitch({ checked, onChange, accent }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="relative w-9 h-5 rounded-full shrink-0 transition-colors"
+      style={{ backgroundColor: checked ? accent : "var(--border-input)" }}
+      aria-pressed={checked}
+    >
+      <span
+        className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all"
+        style={{ left: checked ? "18px" : "2px" }}
+      />
+    </button>
+  );
+}
+
 function MoneyField({ label, value, onChange, suffix }) {
   const digits = String(value || "").replace(/\D/g, "");
   const display = digits ? Number(digits).toLocaleString("uz-UZ") : "";
@@ -462,6 +516,8 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const [regForm, setRegForm] = useState({ username: "", password: "", confirm: "" });
   const [regError, setRegError] = useState("");
   const [showRegPassword, setShowRegPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [showForgotHint, setShowForgotHint] = useState(false);
   const { accent, t } = useApp();
 
   function submitRegister() {
@@ -480,20 +536,41 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     return (
       <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
-          <div className="flex items-center gap-2 justify-center mb-8">
-            <img src="/logo.svg" alt={t("appName")} className="w-9 h-9" />
-            <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
-          </div>
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7 shadow-lg">
-            <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1 tracking-tight">{t("registerTitle")}</h1>
-            <p className="text-[var(--text-muted)] text-sm mb-6">{t("registerSubtitle")}</p>
+          <div className="bg-[var(--bg-card)] rounded-[32px] shadow-xl p-8">
+            <h1 className="text-center text-2xl font-extrabold text-[var(--text-primary)] mb-1 tracking-tight">{t("registerTitle")}</h1>
+            <p className="text-center text-[var(--text-muted)] text-sm mb-7">{t("registerSubtitle")}</p>
             <div className="space-y-3.5">
-              <Field label={t("chooseLogin")} value={regForm.username} onChange={(v) => setRegForm({ ...regForm, username: v })} />
-              <Field label={t("choosePassword")} type="password" value={regForm.password} onChange={(v) => setRegForm({ ...regForm, password: v })} />
-              <Field label={t("repeatNewPassword")} type="password" value={regForm.confirm} onChange={(v) => setRegForm({ ...regForm, confirm: v })} />
+              <IconInput
+                icon={<UserIcon size={17} />}
+                value={regForm.username}
+                onChange={(v) => setRegForm({ ...regForm, username: v })}
+                placeholder={t("chooseLogin")}
+              />
+              <IconInput
+                icon={<Lock size={17} />}
+                type={showRegPassword ? "text" : "password"}
+                value={regForm.password}
+                onChange={(v) => setRegForm({ ...regForm, password: v })}
+                placeholder={t("choosePassword")}
+                showToggle
+                toggleIcon={showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                onToggle={() => setShowRegPassword((v) => !v)}
+              />
+              <IconInput
+                icon={<Lock size={17} />}
+                type={showRegPassword ? "text" : "password"}
+                value={regForm.confirm}
+                onChange={(v) => setRegForm({ ...regForm, confirm: v })}
+                placeholder={t("repeatNewPassword")}
+              />
             </div>
-            {regError && <p className="text-[var(--bad)] text-xs mt-3">{regError}</p>}
-            <button type="button" onClick={submitRegister} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
+            {regError && <p className="text-[var(--bad)] text-xs mt-3 text-center">{regError}</p>}
+            <button
+              type="button"
+              onClick={submitRegister}
+              className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-opacity hover:opacity-90 active:scale-[0.98]"
+              style={{ backgroundColor: "var(--text-primary)", color: "var(--bg-card)" }}
+            >
               {t("createAccountBtn")}
             </button>
             <button
@@ -510,90 +587,105 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   }
 
   return (
-  <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
-    <div className="w-full max-w-sm">
-      <div className="flex items-center gap-2 justify-center mb-8">
-        <img src="/logo.svg" alt={t("appName")} className="w-9 h-9" />
-        <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight">{t("appName")}</span>
-      </div>
-      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-7 shadow-lg">
+    <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="bg-[var(--bg-card)] rounded-[32px] shadow-xl p-8">
 
-        {/* YANGI: rol tanlash segment-kontrol */}
-        <div className="flex bg-[var(--bg-app)] border border-[var(--border-input)] rounded-full p-1 mb-6">
+          {/* Rol tanlash: Ishchi | Boshqaruvchi */}
+          <div className="flex bg-[var(--bg-app)] border border-[var(--border-input)] rounded-full p-1 mb-7">
+            <button
+              type="button"
+              onClick={() => { setAsAdmin(false); setLoginForm({ username: "", password: "" }); setShowForgotHint(false); }}
+              className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
+              style={!asAdmin ? { backgroundColor: accent, color: "#12161c" } : { color: "var(--text-secondary)" }}
+            >
+              {t("roleTabEmployee")}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAsAdmin(true); setLoginForm({ username: "", password: "" }); setShowForgotHint(false); }}
+              className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
+              style={asAdmin ? { backgroundColor: accent, color: "#12161c" } : { color: "var(--text-secondary)" }}
+            >
+              {t("roleTabAdmin")}
+            </button>
+          </div>
+
+          <h1 className="text-center text-3xl font-extrabold text-[var(--text-primary)] mb-1 tracking-tight">
+            {t("loginHeading")}
+          </h1>
+          <p className="text-center text-[var(--text-muted)] text-sm mb-7">
+            {asAdmin ? t("adminLoginTitle") : t("employeeLoginTitle")}
+          </p>
+
+          <div className="space-y-3.5">
+            <IconInput
+              icon={<UserIcon size={17} />}
+              value={loginForm.username}
+              onChange={(v) => setLoginForm({ ...loginForm, username: v })}
+              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
+              placeholder={t("login")}
+              autoFocus
+            />
+            <IconInput
+              icon={<Lock size={17} />}
+              type={showPassword ? "text" : "password"}
+              value={loginForm.password}
+              onChange={(v) => setLoginForm({ ...loginForm, password: v })}
+              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
+              placeholder={t("password")}
+              showToggle
+              toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              onToggle={() => setShowPassword((v) => !v)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between mt-4 mb-1">
+            <div className="flex items-center gap-2">
+              <ToggleSwitch checked={rememberMe} onChange={setRememberMe} accent={accent} />
+              <span className="text-xs text-[var(--text-secondary)]">{t("rememberMe")}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForgotHint((v) => !v)}
+              className="text-xs font-semibold hover:opacity-80 transition-opacity"
+              style={{ color: accent }}
+            >
+              {t("forgotPassword")}
+            </button>
+          </div>
+          {showForgotHint && (
+            <p className="text-[11px] text-[var(--text-muted)] mt-2 leading-snug">{t("forgotPasswordHint")}</p>
+          )}
+
+          {loginError && <p className="text-[var(--bad)] text-xs mt-3 text-center">{loginError}</p>}
+
           <button
             type="button"
-            onClick={() => { setAsAdmin(false); setLoginForm({ username: "", password: "" }); setLoginError(""); }}
-            className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
-            style={
-              !asAdmin
-                ? { backgroundColor: accent, color: "#12161c" }
-                : { color: "var(--text-secondary)" }
-            }
+            onClick={() => onSubmit(asAdmin)}
+            className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-opacity hover:opacity-90 active:scale-[0.98]"
+            style={{ backgroundColor: "var(--text-primary)", color: "var(--bg-card)" }}
           >
-            {t("roleTabEmployee")}
+            {t("loginBtn")}
           </button>
-          <button
-            type="button"
-            onClick={() => { setAsAdmin(true); setLoginForm({ username: "", password: "" }); setLoginError(""); }}
-            className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
-            style={
-              asAdmin
-                ? { backgroundColor: accent, color: "#12161c" }
-                : { color: "var(--text-secondary)" }
-            }
-          >
-            {t("roleTabAdmin")}
-          </button>
+
+          {asAdmin && (
+            <p className="text-center text-xs text-[var(--text-muted)] mt-5">
+              {t("noAccountYet")}{" "}
+              <button
+                type="button"
+                onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
+                className="font-semibold hover:opacity-80 transition-opacity"
+                style={{ color: "var(--bad)" }}
+              >
+                {t("signUpLink")}
+              </button>
+            </p>
+          )}
         </div>
-
-        <h1 className="text-[var(--text-primary)] text-xl font-semibold mb-1 tracking-tight">
-          {asAdmin ? t("adminLoginTitle") : t("employeeLoginTitle")}
-        </h1>
-        <p className="text-[var(--text-muted)] text-sm mb-6">{t("loginSubtitle")}</p>
-        <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("login")}</label>
-        <input
-          className="w-full mb-4 px-3.5 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
-          value={loginForm.username}
-          onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
-          autoFocus
-        />
-        <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("password")}</label>
-        <div className="relative mb-2">
-          <input
-            type={showPassword ? "text" : "password"}
-            className="w-full px-3.5 py-2.5 pr-10 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
-            value={loginForm.password}
-            onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-0 top-0 h-full px-3 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-        </div>
-        {loginError && <p className="text-[var(--bad)] text-xs mb-2 mt-1">{loginError}</p>}
-        <button type="button" onClick={() => onSubmit(asAdmin)} className="w-full mt-4 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>
-          {t("loginBtn")}
-        </button>
-
-        {/* Faqat "Boshqaruvchi" rejimida ro'yxatdan o'tish tugmasi qoladi */}
-        {asAdmin && (
-          <button
-            type="button"
-            onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
-            className="w-full mt-3 py-2.5 rounded-lg border border-dashed border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition-colors flex items-center justify-center gap-1.5"
-          >
-            <UserPlus size={13} /> {t("registerTitle")}
-          </button>
-        )}
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 function CopyButton({ text }) {
@@ -894,7 +986,7 @@ function ProfileDrawer({
   const PAGE_TITLES = { appearance: t("appearance"), privacy: t("privacySecurity"), credentials: t("updateCredentials"), language: t("language"), advanced: t("advanced") };
   const PARENT_PAGE = { credentials: "privacy" };
   const breadcrumbTrail = (() => {
-  const trail = [];
+    const trail = [];
     let cur = page;
     while (cur) {
       trail.unshift(cur);
@@ -975,7 +1067,7 @@ function ProfileDrawer({
           </button>
         </div>
 
-                {page && (
+        {page && (
           <div className="flex items-center gap-1 px-5 pt-2.5 pb-1 text-[11px] flex-wrap">
             <button
               type="button"
@@ -1416,9 +1508,6 @@ function AdminApp({
               <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                 <Calendar size={15} /> {t("markAttendanceHeader")}
               </div>
-              <label className="text-[var(--text-muted)]">
-                <input type="date" max={todayISO()} value={attDate} onChange={(e) => setAttDate(e.target.value)} className="bg-transparent text-[var(--text-secondary)] text-xs outline-none" />
-              </label>
             </div>
             <div className="flex items-center gap-1.5">
               <button
@@ -1490,7 +1579,7 @@ function AdminApp({
             const visibleEmployees = myEmployees.filter((emp) => employeeJoinDate(emp) <= attDate);
             return (
               <>
-           {visibleEmployees.length > 0 && attDate <= todayISO() && (
+          {visibleEmployees.length > 0 && attDate <= todayISO() && (
             <>
               <div className="flex gap-1.5">
                 <button
@@ -1548,6 +1637,7 @@ function AdminApp({
               )}
             </>
           )}
+
           <div className="space-y-2">
             {visibleEmployees.length === 0 && (
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
@@ -1556,48 +1646,49 @@ function AdminApp({
               <p className="text-[var(--warn)] text-xs text-center py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">{t("futureDateWarning")}</p>
             )}
             {visibleEmployees.map((emp) => {
-              const st = attEntryStatus(attendance[emp.id]?.[attDate]);
               const hasEntry = attendance[emp.id]?.[attDate] !== undefined;
+              const st = hasEntry ? attEntryStatus(attendance[emp.id]?.[attDate]) : null;
               const isFuture = attDate > todayISO();
+
+              // Bosilganda holat aylanadi: bo'sh -> to'liq -> yarim -> kelmadi -> bo'sh
+              function cycleStatus() {
+                if (isFuture) return;
+                if (st === null) markAttendance(emp.id, 1);
+                else if (st === 1) markAttendance(emp.id, 0.5);
+                else if (st === 0.5) markAttendance(emp.id, 0);
+                else markAttendance(emp.id, 1);
+              }
+
+              const statusConfig = {
+                null: { label: t("statusNone"), icon: <Calendar size={15} />, bg: "var(--bg-app)", color: "var(--text-muted)", border: "1px solid var(--border-input)" },
+                1: { label: t("fullDay"), icon: <CheckCircle2 size={15} />, bg: "var(--good)", color: "#0e1712", border: "none" },
+                0.5: { label: t("halfDay"), icon: <Calendar size={15} />, bg: "var(--warn)", color: "#1a1608", border: "none" },
+                0: { label: t("absent"), icon: <XCircle size={15} />, bg: "var(--bad)", color: "#1c0e0c", border: "none" },
+              };
+              const cfg = statusConfig[st === null ? "null" : st];
+
               return (
-                <div key={emp.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm">
-                  <div className="flex items-center gap-2.5 mb-3">
+                <button
+                  key={emp.id}
+                  type="button"
+                  disabled={isFuture}
+                  onClick={cycleStatus}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <Avatar src={emp.avatar} name={emp.name} size={32} />
                     <div className="min-w-0">
                       <div className="text-[var(--text-primary)] text-sm font-medium truncate">{emp.name}</div>
                       <div className="text-[var(--text-muted)] text-[11px]">{fmt(emp.dailyWage)}{t("perDay")}</div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      disabled={isFuture}
-                      onClick={() => markAttendance(emp.id, 1)}
-                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={st === 1 ? { backgroundColor: "var(--good)", color: "#0e1712" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
-                    >
-                      <CheckCircle2 size={13} /> {t("fullDay")}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isFuture}
-                      onClick={() => markAttendance(emp.id, 0.5)}
-                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={st === 0.5 ? { backgroundColor: "var(--warn)", color: "#1a1608" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
-                    >
-                      <Calendar size={13} /> {t("halfDay")}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isFuture}
-                      onClick={() => markAttendance(emp.id, 0)}
-                      className="flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={st === 0 && hasEntry ? { backgroundColor: "var(--bad)", color: "#1c0e0c" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
-                    >
-                      <XCircle size={13} /> {t("absent")}
-                    </button>
-                  </div>
-                </div>
+                  <span
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold shrink-0"
+                    style={{ backgroundColor: cfg.bg, color: cfg.color, border: cfg.border }}
+                  >
+                    {cfg.icon} {cfg.label}
+                  </span>
+                </button>
               );
             })}
           </div>
