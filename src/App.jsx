@@ -237,6 +237,8 @@ const PALETTES = {
     "--text-secondary": "#8d97a3",
     "--text-muted": "#69727e",
     "--text-faint": "#5b6470",
+    "--shadow-hi": "rgba(255,255,255,0.03)",
+    "--shadow-lo": "rgba(0,0,0,0.4)",
   },
   light: {
     "--bg-app": "#eef0f3",
@@ -249,6 +251,8 @@ const PALETTES = {
     "--text-secondary": "#565f6b",
     "--text-muted": "#707886",
     "--text-faint": "#78808c",
+    "--shadow-hi": "rgba(255,255,255,0.85)",
+    "--shadow-lo": "rgba(163,169,184,0.4)",
   },
 };
 
@@ -381,6 +385,8 @@ function Field({ label, value, onChange, type = "text" }) {
 // YANGI: rasmga o'xshab, dumaloq (pill) ko'rinishdagi, ichida ikonka bo'lgan input.
 // Login ekranida foydalaniladi — label yo'q, o'rniga placeholder ishlatiladi.
 function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDown, autoFocus, showToggle, toggleIcon, onToggle }) {
+  const baseShadow = "inset -6px -6px 10px var(--shadow-hi), inset 6px 6px 10px var(--shadow-lo)";
+  const focusShadow = `${baseShadow}, 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent)`;
   return (
     <div className="relative">
       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">
@@ -393,10 +399,10 @@ function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDow
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-full bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]`}
-        style={{ "--tw-shadow": "none" }}
-        onFocus={(e) => { e.target.style.boxShadow = `0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent)`; }}
-        onBlur={(e) => { e.target.style.boxShadow = "none"; }}
+        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-full bg-[var(--bg-app)] text-[var(--text-primary)] text-sm outline-none transition-all duration-300 placeholder:text-[var(--text-muted)]`}
+        style={{ boxShadow: baseShadow }}
+        onFocus={(e) => { e.target.style.boxShadow = focusShadow; e.target.style.transform = "translateY(-1px)"; }}
+        onBlur={(e) => { e.target.style.boxShadow = baseShadow; e.target.style.transform = "translateY(0)"; }}
       />
       {showToggle && (
         <button
@@ -640,14 +646,18 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
 
           {loginError && <p className="text-[var(--bad)] text-xs mt-3 text-center">{loginError}</p>}
 
-          <button
-            type="button"
-            onClick={() => onSubmit()}
-            className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-opacity hover:opacity-90 active:scale-[0.98]"
-            style={{ backgroundColor: "var(--text-primary)", color: "var(--bg-card)" }}
-          >
-            {t("loginBtn")}
-          </button>
+<button
+  type="button"
+  onClick={() => onSubmit()}
+  className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-all duration-300 hover:opacity-90 active:scale-[0.97]"
+  style={{
+    backgroundColor: "var(--text-primary)",
+    color: "var(--bg-card)",
+    boxShadow: "-6px -6px 12px var(--shadow-hi), 6px 6px 12px var(--shadow-lo)",
+  }}
+>
+  {t("loginBtn")}
+</button>
 
           <p className="text-center text-xs text-[var(--text-muted)] mt-5">
             {t("noAccountYet")}{" "}
