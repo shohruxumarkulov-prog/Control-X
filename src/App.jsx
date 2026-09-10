@@ -393,7 +393,10 @@ function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDow
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-full bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text-muted)]`}
+        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-full bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]`}
+        style={{ "--tw-shadow": "none" }}
+        onFocus={(e) => { e.target.style.boxShadow = `0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent)`; }}
+        onBlur={(e) => { e.target.style.boxShadow = "none"; }}
       />
       {showToggle && (
         <button
@@ -407,7 +410,6 @@ function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDow
     </div>
   );
 }
-
 // YANGI: "Meni eslab qol" uchun kichik dumaloq svitch (toggle).
 function ToggleSwitch({ checked, onChange, accent }) {
   return (
