@@ -511,7 +511,6 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, 
 
 function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister }) {
   const [showPassword, setShowPassword] = useState(false);
-  const [asAdmin, setAsAdmin] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [regForm, setRegForm] = useState({ username: "", password: "", confirm: "" });
   const [regError, setRegError] = useState("");
@@ -532,7 +531,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     }
   }
 
-  if (asAdmin && registering) {
+  if (registering) {
     return (
       <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
@@ -590,32 +589,11 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="bg-[var(--bg-card)] rounded-[32px] shadow-xl p-8">
-
-          {/* Rol tanlash: Ishchi | Boshqaruvchi */}
-          <div className="flex bg-[var(--bg-app)] border border-[var(--border-input)] rounded-full p-1 mb-7">
-            <button
-              type="button"
-              onClick={() => { setAsAdmin(false); setLoginForm({ username: "", password: "" }); setShowForgotHint(false); }}
-              className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
-              style={!asAdmin ? { backgroundColor: accent, color: "#12161c" } : { color: "var(--text-secondary)" }}
-            >
-              {t("roleTabEmployee")}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setAsAdmin(true); setLoginForm({ username: "", password: "" }); setShowForgotHint(false); }}
-              className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
-              style={asAdmin ? { backgroundColor: accent, color: "#12161c" } : { color: "var(--text-secondary)" }}
-            >
-              {t("roleTabAdmin")}
-            </button>
-          </div>
-
           <h1 className="text-center text-3xl font-extrabold text-[var(--text-primary)] mb-1 tracking-tight">
             {t("loginHeading")}
           </h1>
           <p className="text-center text-[var(--text-muted)] text-sm mb-7">
-            {asAdmin ? t("adminLoginTitle") : t("employeeLoginTitle")}
+            {t("loginSubtitle")}
           </p>
 
           <div className="space-y-3.5">
@@ -623,7 +601,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
               icon={<UserIcon size={17} />}
               value={loginForm.username}
               onChange={(v) => setLoginForm({ ...loginForm, username: v })}
-              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
+              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
               placeholder={t("login")}
               autoFocus
             />
@@ -632,7 +610,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
               type={showPassword ? "text" : "password"}
               value={loginForm.password}
               onChange={(v) => setLoginForm({ ...loginForm, password: v })}
-              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
+              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
               placeholder={t("password")}
               showToggle
               toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -662,26 +640,24 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
 
           <button
             type="button"
-            onClick={() => onSubmit(asAdmin)}
+            onClick={() => onSubmit()}
             className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-opacity hover:opacity-90 active:scale-[0.98]"
             style={{ backgroundColor: "var(--text-primary)", color: "var(--bg-card)" }}
           >
             {t("loginBtn")}
           </button>
 
-          {asAdmin && (
-            <p className="text-center text-xs text-[var(--text-muted)] mt-5">
-              {t("noAccountYet")}{" "}
-              <button
-                type="button"
-                onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
-                className="font-semibold hover:opacity-80 transition-opacity"
-                style={{ color: "var(--bad)" }}
-              >
-                {t("signUpLink")}
-              </button>
-            </p>
-          )}
+          <p className="text-center text-xs text-[var(--text-muted)] mt-5">
+            {t("noAccountYet")}{" "}
+            <button
+              type="button"
+              onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
+              className="font-semibold hover:opacity-80 transition-opacity"
+              style={{ color: "var(--bad)" }}
+            >
+              {t("signUpLink")}
+            </button>
+          </p>
         </div>
       </div>
     </div>
@@ -2349,9 +2325,8 @@ function WorkforceAppInner() {
     await safeSet("advances-data", JSON.stringify(data));
   }
 
-  function handleLogin(asAdmin) {
+  function handleLogin() {
     setLoginError("");
-    // FIX: agar oldingi urinishlar tufayli hozir bloklangan bo'lsak, urinishni to'xtatamiz.
     if (Date.now() < lockedUntil) {
       const secsLeft = Math.ceil((lockedUntil - Date.now()) / 1000);
       setLoginError(
@@ -2367,22 +2342,18 @@ function WorkforceAppInner() {
       const admins = (usersData && usersData.admins) ? usersData.admins : { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password } };
       const employees = (usersData && usersData.employees) ? usersData.employees : [];
 
-      if (asAdmin) {
-        if (admins[username] && admins[username].password === password) {
-          setFailedAttempts(0); // FIX: muvaffaqiyatli kirishda hisoblagichni tozalaymiz
-          setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username });
-          return;
-        }
-      } else {
-        const emp = employees.find((x) => x.username === username && x.password === password);
-        if (emp) {
-          setFailedAttempts(0); // FIX: muvaffaqiyatli kirishda hisoblagichni tozalaymiz
-          setCurrentUser({ role: "employee", id: emp.id, name: emp.name, owner: emp.owner });
-          return;
-        }
+      const emp = employees.find((x) => x.username === username && x.password === password);
+      if (emp) {
+        setFailedAttempts(0);
+        setCurrentUser({ role: "employee", id: emp.id, name: emp.name, owner: emp.owner });
+        return;
       }
-      // FIX: noto'g'ri urinishni hisoblaymiz — 5 marta ketma-ket xato bo'lsa,
-      // 30 soniyaga bloklaymiz (oddiy frontend darajasidagi cheklov).
+      if (admins[username] && admins[username].password === password) {
+        setFailedAttempts(0);
+        setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username });
+        return;
+      }
+
       setFailedAttempts((prev) => {
         const next = prev + 1;
         if (next >= 5) {
