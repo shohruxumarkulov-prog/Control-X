@@ -429,7 +429,7 @@ function ToggleSwitch({ checked, onChange }) {
       className="relative w-8 h-[18px] rounded-full shrink-0 bg-[#e8e8e8] transition-all duration-300"
       style={{
         boxShadow: checked
-          ? "inset 3px 3px 6px rgba(120,10,10,0.35), inset -3px -3px 6px rgba(212,175,55,0.25)"
+          ? "inset 3px 3px 6px rgba(20,60,140,0.35), inset -3px -3px 6px rgba(70,130,220,0.25)"
           : "inset 3px 3px 6px rgba(184,190,204,0.5), inset -3px -3px 6px rgba(255,255,255,0.9)",
       }}
       aria-pressed={checked}
@@ -438,7 +438,7 @@ function ToggleSwitch({ checked, onChange }) {
         className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all duration-300"
         style={{
           left: checked ? "16px" : "2px",
-          backgroundColor: checked ? "#a10f0f" : "#e8e8e8",
+          backgroundColor: checked ? "#1a56b0" : "#e8e8e8",
           boxShadow: "1px 1px 3px rgba(0,0,0,0.25)",
         }}
       />
@@ -555,7 +555,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const cardShadow = "-22px -22px 44px #ffffff, 22px 22px 50px #c3c3c3";
   const titleShadow = "1px 1px 1px rgba(255,255,255,0.9), -2px -2px 1px rgba(163,163,163,0.25)";
   const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
-  const btnShadowHover = "0 10px 22px rgba(120,10,10,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
+  const btnShadowHover = "0 10px 22px rgba(20,60,140,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
 
   if (registering) {
     return (
