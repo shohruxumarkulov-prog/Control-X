@@ -387,12 +387,12 @@ function Field({ label, value, onChange, type = "text" }) {
 function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDown, autoFocus, showToggle, toggleIcon, onToggle }) {
   const [focused, setFocused] = useState(false);
   const baseShadow = "inset -6px -6px 10px rgba(255,255,255,0.95), inset 6px 6px 10px rgba(184,190,204,0.45)";
-  const focusShadow = "inset 3px 3px 6px rgba(120,10,10,0.35), inset -3px -3px 6px rgba(212,55,55,0.25)";
+  const focusShadow = "inset 3px 3px 6px rgba(20,60,140,0.35), inset -3px -3px 6px rgba(70,130,220,0.25)";
   return (
     <div className="relative">
       <span
         className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-300"
-        style={{ color: focused ? "#a10f0f" : "#909090" }}
+        style={{ color: focused ? "#1a56b0" : "#909090" }}
       >
         {icon}
       </span>
@@ -597,7 +597,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
               onMouseLeave={() => setBtnHover(false)}
               className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97]"
               style={{
-                background: btnHover ? "linear-gradient(155deg, #b21414 0%, #7c0d0d 100%)" : "#e8e8e8",
+                background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
                 color: btnHover ? "#f5e9c8" : "#838383",
                 boxShadow: btnHover ? btnShadowHover : btnShadowRest,
                 transform: btnHover ? "translateY(-2px)" : "translateY(0)",
@@ -679,7 +679,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
             onMouseLeave={() => setBtnHover(false)}
             className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97]"
             style={{
-              background: btnHover ? "linear-gradient(155deg, #b21414 0%, #7c0d0d 100%)" : "#e8e8e8",
+              background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
               color: btnHover ? "#f5e9c8" : "#838383",
               boxShadow: btnHover ? btnShadowHover : btnShadowRest,
               transform: btnHover ? "translateY(-2px)" : "translateY(0)",
