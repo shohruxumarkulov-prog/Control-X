@@ -385,11 +385,15 @@ function Field({ label, value, onChange, type = "text" }) {
 // YANGI: rasmga o'xshab, dumaloq (pill) ko'rinishdagi, ichida ikonka bo'lgan input.
 // Login ekranida foydalaniladi — label yo'q, o'rniga placeholder ishlatiladi.
 function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDown, autoFocus, showToggle, toggleIcon, onToggle }) {
-  const baseShadow = "inset -6px -6px 10px var(--shadow-hi), inset 6px 6px 10px var(--shadow-lo)";
-  const focusShadow = `${baseShadow}, 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent)`;
+  const [focused, setFocused] = useState(false);
+  const baseShadow = "inset -6px -6px 10px rgba(255,255,255,0.95), inset 6px 6px 10px rgba(184,190,204,0.45)";
+  const focusShadow = "inset 3px 3px 6px rgba(120,10,10,0.35), inset -3px -3px 6px rgba(212,55,55,0.25)";
   return (
     <div className="relative">
-      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">
+      <span
+        className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-300"
+        style={{ color: focused ? "#a10f0f" : "#909090" }}
+      >
         {icon}
       </span>
       <input
@@ -399,16 +403,16 @@ function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDow
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-full bg-[var(--bg-app)] text-[var(--text-primary)] text-sm outline-none transition-all duration-300 placeholder:text-[var(--text-muted)]`}
-        style={{ boxShadow: baseShadow }}
-        onFocus={(e) => { e.target.style.boxShadow = focusShadow; e.target.style.transform = "translateY(-1px)"; }}
-        onBlur={(e) => { e.target.style.boxShadow = baseShadow; e.target.style.transform = "translateY(0)"; }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-2xl bg-[#e8e8e8] text-[#4a4a4a] text-sm font-medium outline-none border-none transition-all duration-300 placeholder:text-[#a3a3a3]`}
+        style={{ boxShadow: focused ? focusShadow : baseShadow, transform: focused ? "translateY(-2px)" : "translateY(0)" }}
       />
       {showToggle && (
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-[#909090] hover:text-[#a10f0f] transition-colors"
         >
           {toggleIcon}
         </button>
@@ -417,18 +421,26 @@ function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDow
   );
 }
 // YANGI: "Meni eslab qol" uchun kichik dumaloq svitch (toggle).
-function ToggleSwitch({ checked, onChange, accent }) {
+function ToggleSwitch({ checked, onChange }) {
   return (
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="relative w-9 h-5 rounded-full shrink-0 transition-colors"
-      style={{ backgroundColor: checked ? accent : "var(--border-input)" }}
+      className="relative w-8 h-[18px] rounded-full shrink-0 bg-[#e8e8e8] transition-all duration-300"
+      style={{
+        boxShadow: checked
+          ? "inset 3px 3px 6px rgba(120,10,10,0.35), inset -3px -3px 6px rgba(212,175,55,0.25)"
+          : "inset 3px 3px 6px rgba(184,190,204,0.5), inset -3px -3px 6px rgba(255,255,255,0.9)",
+      }}
       aria-pressed={checked}
     >
       <span
-        className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all"
-        style={{ left: checked ? "18px" : "2px" }}
+        className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all duration-300"
+        style={{
+          left: checked ? "16px" : "2px",
+          backgroundColor: checked ? "#a10f0f" : "#e8e8e8",
+          boxShadow: "1px 1px 3px rgba(0,0,0,0.25)",
+        }}
       />
     </button>
   );
@@ -525,7 +537,8 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showForgotHint, setShowForgotHint] = useState(false);
-  const { accent, t } = useApp();
+  const [btnHover, setBtnHover] = useState(false);
+  const { t } = useApp();
 
   function submitRegister() {
     setRegError("");
@@ -539,13 +552,18 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     }
   }
 
+  const cardShadow = "-22px -22px 44px #ffffff, 22px 22px 50px #c3c3c3";
+  const titleShadow = "1px 1px 1px rgba(255,255,255,0.9), -2px -2px 1px rgba(163,163,163,0.25)";
+  const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
+  const btnShadowHover = "0 10px 22px rgba(120,10,10,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
+
   if (registering) {
     return (
-      <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
         <div className="w-full max-w-sm">
-          <div className="bg-[var(--bg-card)] rounded-[32px] shadow-xl p-8">
-            <h1 className="text-center text-2xl font-extrabold text-[var(--text-primary)] mb-1 tracking-tight">{t("registerTitle")}</h1>
-            <p className="text-center text-[var(--text-muted)] text-sm mb-7">{t("registerSubtitle")}</p>
+          <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
+            <h1 className="text-center text-2xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>{t("registerTitle")}</h1>
+            <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
             <div className="space-y-3.5">
               <IconInput
                 icon={<UserIcon size={17} />}
@@ -571,19 +589,27 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
                 placeholder={t("repeatNewPassword")}
               />
             </div>
-            {regError && <p className="text-[var(--bad)] text-xs mt-3 text-center">{regError}</p>}
+            {regError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{regError}</p>}
             <button
               type="button"
               onClick={submitRegister}
-              className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-opacity hover:opacity-90 active:scale-[0.98]"
-              style={{ backgroundColor: "var(--text-primary)", color: "var(--bg-card)" }}
+              onMouseEnter={() => setBtnHover(true)}
+              onMouseLeave={() => setBtnHover(false)}
+              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97]"
+              style={{
+                background: btnHover ? "linear-gradient(155deg, #b21414 0%, #7c0d0d 100%)" : "#e8e8e8",
+                color: btnHover ? "#f5e9c8" : "#838383",
+                boxShadow: btnHover ? btnShadowHover : btnShadowRest,
+                transform: btnHover ? "translateY(-2px)" : "translateY(0)",
+              }}
             >
               {t("createAccountBtn")}
             </button>
             <button
               type="button"
               onClick={() => { setRegistering(false); setRegForm({ username: "", password: "", confirm: "" }); setRegError(""); }}
-              className="w-full mt-3 py-2 rounded-lg text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+              className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors"
+              style={{ color: "#9a9a9a" }}
             >
               {t("alreadyHaveAccount")}
             </button>
@@ -594,13 +620,13 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
       <div className="w-full max-w-sm">
-        <div className="bg-[var(--bg-card)] rounded-[32px] shadow-xl p-8">
-          <h1 className="text-center text-3xl font-extrabold text-[var(--text-primary)] mb-1 tracking-tight">
+        <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
+          <h1 className="text-center text-3xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
             {t("loginHeading")}
           </h1>
-          <p className="text-center text-[var(--text-muted)] text-sm mb-7">
+          <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>
             {t("loginSubtitle")}
           </p>
 
@@ -627,45 +653,48 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
           </div>
 
           <div className="flex items-center justify-between mt-4 mb-1">
-            <div className="flex items-center gap-2">
-              <ToggleSwitch checked={rememberMe} onChange={setRememberMe} accent={accent} />
-              <span className="text-xs text-[var(--text-secondary)]">{t("rememberMe")}</span>
+            <div className="flex items-center gap-2.5">
+              <ToggleSwitch checked={rememberMe} onChange={setRememberMe} />
+              <span className="text-xs" style={{ color: "#929191" }}>{t("rememberMe")}</span>
             </div>
             <button
               type="button"
               onClick={() => setShowForgotHint((v) => !v)}
-              className="text-xs font-semibold hover:opacity-80 transition-opacity"
-              style={{ color: accent }}
+              className="text-xs font-medium transition-colors hover:opacity-80"
+              style={{ color: "#929191" }}
             >
               {t("forgotPassword")}
             </button>
           </div>
           {showForgotHint && (
-            <p className="text-[11px] text-[var(--text-muted)] mt-2 leading-snug">{t("forgotPasswordHint")}</p>
+            <p className="text-[11px] mt-2 leading-snug" style={{ color: "#9a9a9a" }}>{t("forgotPasswordHint")}</p>
           )}
 
-          {loginError && <p className="text-[var(--bad)] text-xs mt-3 text-center">{loginError}</p>}
+          {loginError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{loginError}</p>}
 
-<button
-  type="button"
-  onClick={() => onSubmit()}
-  className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-all duration-300 hover:opacity-90 active:scale-[0.97]"
-  style={{
-    backgroundColor: "var(--text-primary)",
-    color: "var(--bg-card)",
-    boxShadow: "-6px -6px 12px var(--shadow-hi), 6px 6px 12px var(--shadow-lo)",
-  }}
->
-  {t("loginBtn")}
-</button>
+          <button
+            type="button"
+            onClick={() => onSubmit()}
+            onMouseEnter={() => setBtnHover(true)}
+            onMouseLeave={() => setBtnHover(false)}
+            className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97]"
+            style={{
+              background: btnHover ? "linear-gradient(155deg, #b21414 0%, #7c0d0d 100%)" : "#e8e8e8",
+              color: btnHover ? "#f5e9c8" : "#838383",
+              boxShadow: btnHover ? btnShadowHover : btnShadowRest,
+              transform: btnHover ? "translateY(-2px)" : "translateY(0)",
+            }}
+          >
+            {t("loginBtn")}
+          </button>
 
-          <p className="text-center text-xs text-[var(--text-muted)] mt-5">
+          <p className="text-center text-xs mt-5" style={{ color: "#9a9a9a" }}>
             {t("noAccountYet")}{" "}
             <button
               type="button"
               onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
-              className="font-semibold hover:opacity-80 transition-opacity"
-              style={{ color: "var(--bad)" }}
+              className="font-semibold transition-opacity hover:opacity-80"
+              style={{ color: "#a10f0f" }}
             >
               {t("signUpLink")}
             </button>
