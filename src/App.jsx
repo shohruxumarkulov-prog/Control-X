@@ -256,7 +256,6 @@ const PALETTES = {
   },
 };
 
-const ADMIN_DEFAULT = { username: "admin", password: "admin123" };
 const VAPID_PUBLIC_KEY = "BJHw7YqggwDUKfjS9pOcZyA_y7MO_46FWaRKv-fF8zr71CDEycK7hlEzq_hq4IzW7VhzysMJFZ-jXP4ULEYzn3k";
 
 function urlBase64ToUint8Array(base64String) {
@@ -302,32 +301,6 @@ class AppErrorBoundary extends Component {
       );
     }
     return this.props.children;
-  }
-}
-
-const memoryStore = {};
-
-async function safeGet(key) {
-  try {
-    const { data, error } = await supabase
-      .from("app_storage")
-      .select("value")
-      .eq("key", key)
-      .maybeSingle();
-    if (!error && data && typeof data.value !== "undefined") {
-      memoryStore[key] = data.value;
-      return data.value;
-    }
-  } catch (e) {
-  }
-  return memoryStore[key];
-}
-
-async function safeSet(key, value) {
-  memoryStore[key] = value;
-  try {
-    await supabase.from("app_storage").upsert({ key, value, updated_at: new Date().toISOString() });
-  } catch (e) {
   }
 }
 
@@ -529,26 +502,140 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, 
   );
 }
 
-function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister }) {
+function RecoveryCodeModal({ code, onClose }) {
+  const [copied, setCopied] = useState(false);
+  async function doCopy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {}
+  }
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
+      <div className="w-full max-w-sm bg-[var(--bg-panel)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl">
+        <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold text-base mb-1.5">
+          <KeyRound size={18} className="text-[var(--accent)]" /> Tiklash kodingiz
+        </div>
+        <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
+          Parolni unutsangiz, faqat shu kod orqali tiklay olasiz. Bu kod FAQAT hozir ko'rsatiladi — uni xavfsiz joyga yozib qo'ying.
+        </p>
+        <div className="bg-[var(--bg-app)] border border-[var(--border-input)] rounded-xl px-4 py-3 text-center font-mono text-lg tracking-widest text-[var(--text-primary)] mb-3 select-all">
+          {code}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={doCopy}
+            className="flex-1 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium flex items-center justify-center gap-1.5"
+          >
+            {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Nusxalandi" : "Nusxalash"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-[#12161c] text-xs font-semibold"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            Saqladim, tushundim
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminRecoveryForm({ onDone, onBack }) {
+  const [step, setStep] = useState("code"); // code -> newPassword yoki done
+  const [username, setUsername] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [newRecoveryCode, setNewRecoveryCode] = useState(null);
+
+  async function submit() {
+    setError("");
+    if (!username.trim() || !recoveryCode.trim()) { setError("Login va tiklash kodini kiriting"); return; }
+    if (!newPassword || newPassword.length < 6) { setError("Yangi parol kamida 6 belgidan iborat bo'lsin"); return; }
+    setBusy(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("reset-admin-password", {
+        body: { username: username.trim(), recoveryCode: recoveryCode.trim(), newPassword },
+      });
+      if (fnError || data?.error) {
+        setError(data?.error || "Xato yuz berdi");
+        setBusy(false);
+        return;
+      }
+      setNewRecoveryCode(data.newRecoveryCode);
+      setBusy(false);
+    } catch (e) {
+      setError(String(e?.message || e));
+      setBusy(false);
+    }
+  }
+
+  if (newRecoveryCode) {
+    return (
+      <RecoveryCodeModal
+        code={newRecoveryCode}
+        onClose={() => onDone()}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <IconInput icon={<UserIcon size={17} />} value={username} onChange={setUsername} placeholder="Login" />
+      <IconInput icon={<KeyRound size={17} />} value={recoveryCode} onChange={setRecoveryCode} placeholder="Tiklash kodi (XXXX-XXXX-...)" />
+      <IconInput icon={<Lock size={17} />} type="password" value={newPassword} onChange={setNewPassword} placeholder="Yangi parol" />
+      {error && <p className="text-xs text-center" style={{ color: "#a10f0f" }}>{error}</p>}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={submit}
+        className="w-full py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest text-[#f5e9c8] disabled:opacity-60"
+        style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
+      >
+        {busy ? "Yuborilmoqda..." : "Parolni tiklash"}
+      </button>
+      <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>
+        Ortga
+      </button>
+    </div>
+  );
+}
+
+function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister, loginBusy }) {
   const [showPassword, setShowPassword] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [regForm, setRegForm] = useState({ username: "", password: "", confirm: "" });
   const [regError, setRegError] = useState("");
+  const [regBusy, setRegBusy] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showForgotHint, setShowForgotHint] = useState(false);
+  const [forgotMode, setForgotMode] = useState(null); // null | 'choose' | 'employee' | 'admin'
   const [btnHover, setBtnHover] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState(null);
   const { t } = useApp();
 
-  function submitRegister() {
+  async function submitRegister() {
     setRegError("");
     if (regForm.password !== regForm.confirm) {
       setRegError(t("errPasswordMismatch"));
       return;
     }
-    const result = onRegister(regForm.username.trim(), regForm.password);
+    setRegBusy(true);
+    const result = await onRegister(regForm.username.trim(), regForm.password);
+    setRegBusy(false);
     if (result && result.error) {
       setRegError(result.error);
+      return;
+    }
+    if (result && result.recoveryCode) {
+      setRecoveryCode(result.recoveryCode);
     }
   }
 
@@ -556,6 +643,14 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const titleShadow = "1px 1px 1px rgba(255,255,255,0.9), -2px -2px 1px rgba(163,163,163,0.25)";
   const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
   const btnShadowHover = "0 10px 22px rgba(20,60,140,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
+
+  if (recoveryCode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
+        <RecoveryCodeModal code={recoveryCode} onClose={() => { setRecoveryCode(null); setRegistering(false); }} />
+      </div>
+    );
+  }
 
   if (registering) {
     return (
@@ -592,10 +687,11 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
             {regError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{regError}</p>}
             <button
               type="button"
+              disabled={regBusy}
               onClick={submitRegister}
               onMouseEnter={() => setBtnHover(true)}
               onMouseLeave={() => setBtnHover(false)}
-              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97]"
+              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
               style={{
                 background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
                 color: btnHover ? "#f5e9c8" : "#838383",
@@ -603,7 +699,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
                 transform: btnHover ? "translateY(-2px)" : "translateY(0)",
               }}
             >
-              {t("createAccountBtn")}
+              {regBusy ? t("loading") : t("createAccountBtn")}
             </button>
             <button
               type="button"
@@ -613,6 +709,40 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
             >
               {t("alreadyHaveAccount")}
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (forgotMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
+        <div className="w-full max-w-sm">
+          <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
+            {forgotMode === "choose" && (
+              <div className="space-y-3">
+                <p className="text-center text-sm mb-4" style={{ color: "#6a6a6a" }}>Siz kimsiz?</p>
+                <button type="button" onClick={() => setForgotMode("employee")} className="w-full py-3 rounded-2xl text-sm font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
+                  {t("roleTabEmployee")}
+                </button>
+                <button type="button" onClick={() => setForgotMode("admin")} className="w-full py-3 rounded-2xl text-sm font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
+                  {t("roleTabAdmin")}
+                </button>
+                <button type="button" onClick={() => setForgotMode(null)} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>{t("cancel")}</button>
+              </div>
+            )}
+            {forgotMode === "employee" && (
+              <div className="space-y-3 text-center">
+                <p className="text-sm leading-snug" style={{ color: "#6a6a6a" }}>{t("forgotPasswordHint")}</p>
+                <button type="button" onClick={() => setForgotMode(null)} className="w-full py-2.5 rounded-lg text-xs font-medium mt-2" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
+                  {t("cancel")}
+                </button>
+              </div>
+            )}
+            {forgotMode === "admin" && (
+              <AdminRecoveryForm onDone={() => setForgotMode(null)} onBack={() => setForgotMode(null)} />
+            )}
           </div>
         </div>
       </div>
@@ -659,25 +789,23 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
             </div>
             <button
               type="button"
-              onClick={() => setShowForgotHint((v) => !v)}
+              onClick={() => setForgotMode("choose")}
               className="text-xs font-medium transition-colors hover:opacity-80"
               style={{ color: "#929191" }}
             >
               {t("forgotPassword")}
             </button>
           </div>
-          {showForgotHint && (
-            <p className="text-[11px] mt-2 leading-snug" style={{ color: "#9a9a9a" }}>{t("forgotPasswordHint")}</p>
-          )}
 
           {loginError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{loginError}</p>}
 
           <button
             type="button"
+            disabled={loginBusy}
             onClick={() => onSubmit()}
             onMouseEnter={() => setBtnHover(true)}
             onMouseLeave={() => setBtnHover(false)}
-            className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97]"
+            className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
             style={{
               background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
               color: btnHover ? "#f5e9c8" : "#838383",
@@ -685,7 +813,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
               transform: btnHover ? "translateY(-2px)" : "translateY(0)",
             }}
           >
-            {t("loginBtn")}
+            {loginBusy ? t("loading") : t("loginBtn")}
           </button>
 
           <p className="text-center text-xs mt-5" style={{ color: "#9a9a9a" }}>
@@ -754,19 +882,28 @@ function Lightbox({ src, name, onClose }) {
   );
 }
 
-function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
+function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword }) {
   const [open, setOpen] = useState(false);
-  const [reveal, setReveal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [editingWage, setEditingWage] = useState(false);
   const [wageDraft, setWageDraft] = useState(String(emp.dailyWage || ""));
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPw, setResetPw] = useState("");
+  const [resetMsg, setResetMsg] = useState("");
   const { accent, t } = useApp();
 
-  function saveWage() {
+  async function saveWage() {
     const n = Number(wageDraft);
-    if (wageDraft && n >= 0) onUpdateWage(n);
+    if (wageDraft && n >= 0) await onUpdateWage(n);
     setEditingWage(false);
+  }
+
+  async function submitReset() {
+    if (!resetPw || resetPw.length < 6) { setResetMsg("Parol kamida 6 belgidan iborat bo'lsin"); return; }
+    const result = await onResetPassword(resetPw);
+    if (result && result.error) setResetMsg(result.error);
+    else { setResetMsg("Yangi parol o'rnatildi!"); setResetPw(""); }
   }
 
   return (
@@ -825,6 +962,29 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
             </div>
             <CopyButton text={emp.username} />
           </div>
+
+          {!resetOpen ? (
+            <button
+              type="button"
+              onClick={() => { setResetOpen(true); setResetMsg(""); }}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+            >
+              <KeyRound size={13} /> Parolni tiklash
+            </button>
+          ) : (
+            <div className="bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg p-3 space-y-2">
+              <Field label="Yangi parol" type="password" value={resetPw} onChange={setResetPw} />
+              {resetMsg && <p className="text-[var(--text-secondary)] text-xs">{resetMsg}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={submitReset} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
+                  {t("save")}
+                </button>
+                <button type="button" onClick={() => { setResetOpen(false); setResetPw(""); }} className="flex-1 py-2 rounded-lg bg-transparent border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                  {t("cancel")}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1 mt-1">
             <Wallet size={12} /> {t("dailyWage")}
@@ -989,12 +1149,11 @@ function ProfileDrawer({
   const [newPw2, setNewPw2] = useState("");
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
   const [confirmDeleteAcc, setConfirmDeleteAcc] = useState(false);
-  // FIX: yangi qo'shildi — avval akkauntni o'chirish tugmasi hech qanday parol
-  // so'ramasdan ishlar edi. Umumiy kompyuterda seans ochiq qolgan bo'lsa,
-  // boshqa kishi ikkita tugma bosib akkauntni butunlay o'chirib yuborishi mumkin edi.
   const [deletePwInput, setDeletePwInput] = useState("");
   const [deletePwError, setDeletePwError] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     if (!open) setPage(null);
@@ -1025,25 +1184,24 @@ function ProfileDrawer({
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function submitPassword() {
+  async function submitPassword() {
     setMsg({ type: "", text: "" });
-    if (currentPw !== me.password) {
-      setMsg({ type: "error", text: t("errWrongCurrentPassword") });
-      return;
-    }
     if (!newUsername.trim()) {
       setMsg({ type: "error", text: t("errEmptyLogin") });
       return;
     }
-    if (!newPw || newPw.length < 4) {
-      setMsg({ type: "error", text: t("errShortPassword") });
+    const wantsPasswordChange = !!newPw || !!newPw2;
+    if (wantsPasswordChange && (!newPw || newPw.length < 6)) {
+      setMsg({ type: "error", text: "Yangi parol kamida 6 belgidan iborat bo'lsin" });
       return;
     }
-    if (newPw !== newPw2) {
+    if (wantsPasswordChange && newPw !== newPw2) {
       setMsg({ type: "error", text: t("errPasswordMismatch") });
       return;
     }
-    const result = changeOwnCredentials(newUsername.trim(), newPw);
+    setSaveBusy(true);
+    const result = await changeOwnCredentials(newUsername.trim(), wantsPasswordChange ? newPw : null, currentPw);
+    setSaveBusy(false);
     if (result && result.error) {
       setMsg({ type: "error", text: result.error });
       return;
@@ -1208,7 +1366,7 @@ function ProfileDrawer({
             <div className="space-y-3">
               <Field label={t("currentPassword")} type="password" value={currentPw} onChange={setCurrentPw} />
               <Field label={t("newLogin")} value={newUsername} onChange={setNewUsername} />
-              <Field label={t("newPassword")} type="password" value={newPw} onChange={setNewPw} />
+              <Field label={t("newPassword") + " (ixtiyoriy)"} type="password" value={newPw} onChange={setNewPw} />
               <Field label={t("repeatNewPassword")} type="password" value={newPw2} onChange={setNewPw2} />
             </div>
             {msg.text && (
@@ -1216,11 +1374,12 @@ function ProfileDrawer({
             )}
             <button
               type="button"
+              disabled={saveBusy}
               onClick={submitPassword}
-              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
+              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
               style={{ backgroundColor: accent }}
             >
-              {t("save")}
+              {saveBusy ? t("loading") : t("save")}
             </button>
           </div>
         )}
@@ -1263,7 +1422,6 @@ function ProfileDrawer({
                 <p className="text-[var(--bad)] text-xs mb-2.5">
                   {isAdmin ? t("confirmDeleteAccountAdmin") : t("confirmDeleteAccountEmployee")}
                 </p>
-                {/* FIX: yangi qo'shildi — o'chirishdan oldin joriy parol tasdiqlanadi */}
                 <div className="mb-2.5">
                   <Field label={t("currentPassword")} type="password" value={deletePwInput} onChange={setDeletePwInput} />
                   {deletePwError && <p className="text-[var(--bad)] text-xs mt-1.5">{deletePwError}</p>}
@@ -1271,16 +1429,18 @@ function ProfileDrawer({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (deletePwInput !== me.password) {
-                        setDeletePwError(t("errWrongCurrentPassword"));
-                        return;
+                    disabled={deleteBusy}
+                    onClick={async () => {
+                      setDeleteBusy(true);
+                      const result = await onDeleteAccount(deletePwInput);
+                      setDeleteBusy(false);
+                      if (result && result.error) {
+                        setDeletePwError(result.error);
                       }
-                      onDeleteAccount();
                     }}
-                    className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                    className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
                   >
-                    {t("yesDeleteAccount")}
+                    {deleteBusy ? t("loading") : t("yesDeleteAccount")}
                   </button>
                   <button
                     type="button"
@@ -1302,7 +1462,7 @@ function ProfileDrawer({
 function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
-  newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
+  newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage, resetEmployeePassword,
   attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
@@ -1310,11 +1470,12 @@ function AdminApp({
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const { t } = useApp();
-  const myAdmin = usersData.admins[currentUser.username] || { password: "", avatar: null };
+  const myAdmin = usersData.admins[currentUser.username] || { avatar: null };
   const myEmployees = usersData.employees.filter((e) => e.owner === currentUser.username);
   const tabs = [
     { id: "employees", label: t("navEmployees"), icon: <Users size={18} /> },
@@ -1370,7 +1531,6 @@ function AdminApp({
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      // FIX: toISOString() UTC beradi — mahalliy sana bilan bir kunlik farq bo'lishi mumkin edi.
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     });
   })();
@@ -1406,7 +1566,7 @@ function AdminApp({
       <ProfileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        me={{ name: currentUser.username, username: currentUser.username, password: myAdmin.password, avatar: myAdmin.avatar }}
+        me={{ name: currentUser.username, username: currentUser.username, avatar: myAdmin.avatar }}
         roleLabel={t("adminPanel")}
         isAdmin={true}
         onDeleteAccount={deleteOwnAccount}
@@ -1423,7 +1583,7 @@ function AdminApp({
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
         notifications={notifications}
-        onMarkAllRead={() => markAllNotificationsRead(currentUser.username)}
+        onMarkAllRead={() => markAllNotificationsRead()}
       />
       <Shell
         title={t("adminPanel")}
@@ -1464,7 +1624,7 @@ function AdminApp({
                 <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                   <UserPlus size={15} /> {t("addEmployeeHeader")}
                 </div>
-                <button type="button" onClick={() => { setShowAddForm(false); setEmpError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => { setShowAddForm(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                   <X size={16} />
                 </button>
               </div>
@@ -1477,11 +1637,12 @@ function AdminApp({
               {empError && <p className="text-[var(--bad)] text-xs mt-3">{empError}</p>}
               <button
                 type="button"
-                onClick={async () => { await addEmployee(); setShowAddForm(false); }}
-                className="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
+                disabled={addBusy}
+                onClick={async () => { setAddBusy(true); const ok = await addEmployee(); setAddBusy(false); if (ok) setShowAddForm(false); }}
+                className="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
                 style={{ backgroundColor: accent }}
               >
-                <Plus size={14} /> {t("add")}
+                <Plus size={14} /> {addBusy ? t("loading") : t("add")}
               </button>
             </div>
           )}
@@ -1511,7 +1672,14 @@ function AdminApp({
                 return <p className="text-[var(--text-muted)] text-sm text-center py-8">Hech kim topilmadi</p>;
               }
               return filteredEmployees.map((emp) => (
-                <EmployeeRow key={emp.id} emp={emp} summary={summaryFor(emp.id)} onDelete={() => deleteEmployee(emp.id)} onUpdateWage={(w) => updateEmployeeWage(emp.id, w)} />
+                <EmployeeRow
+                  key={emp.id}
+                  emp={emp}
+                  summary={summaryFor(emp.id)}
+                  onDelete={() => deleteEmployee(emp.id)}
+                  onUpdateWage={(w) => updateEmployeeWage(emp.id, w)}
+                  onResetPassword={(pw) => resetEmployeePassword(emp.id, pw)}
+                />
               ));
             })()}
           </div>
@@ -1667,7 +1835,6 @@ function AdminApp({
               const st = hasEntry ? attEntryStatus(attendance[emp.id]?.[attDate]) : null;
               const isFuture = attDate > todayISO();
 
-              // Bosilganda holat aylanadi: bo'sh -> to'liq -> yarim -> kelmadi -> bo'sh
               function cycleStatus() {
                 if (isFuture) return;
                 if (st === null) markAttendance(emp.id, 1);
@@ -1967,7 +2134,7 @@ function EmployeeApp({
       <ProfileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        me={{ name: s.emp.name, username: s.emp.username, password: s.emp.password, avatar: s.emp.avatar }}
+        me={{ name: s.emp.name, username: s.emp.username, avatar: s.emp.avatar }}
         roleLabel={t("employeePanel")}
         isAdmin={false}
         onDeleteAccount={deleteOwnAccount}
@@ -2175,35 +2342,20 @@ export default function WorkforceApp() {
 
 function WorkforceAppInner() {
   const [loading, setLoading] = useState(true);
-  const [initTimedOut, setInitTimedOut] = useState(false); // FIX: yangi holat — init() cho'zilib ketsa oq ekran o'rniga xabar ko'rsatish uchun
   const [usersData, setUsersData] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [advances, setAdvances] = useState({});
-  const [currentUser, setCurrentUserState] = useState(() => {
-    try {
-      const raw = localStorage.getItem("current-user");
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
-  });
+  const [session, setSession] = useState(null);
+  const [currentUser, setCurrentUserState] = useState(null);
+  const [recoveryCodeToShow, setRecoveryCodeToShow] = useState(null);
+
   function setCurrentUser(user) {
     setCurrentUserState(user);
-    try {
-      if (user) localStorage.setItem("current-user", JSON.stringify(user));
-      else localStorage.removeItem("current-user");
-    } catch (e) {
-    }
   }
+
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
-  // FIX: yangi qo'shildi — avval login urinishlariga hech qanday cheklov yo'q edi,
-  // shu sabab brute-force (parolni "sinab ko'rish") hujumidan himoya bo'lmagan.
-  // Bu FAQAT frontend darajasidagi yumshoq to'siq — asosiy himoya Supabase/backend
-  // tomonida (masalan Supabase Auth yoki rate-limit funksiyasi) bo'lishi kerak,
-  // buni Supabase qismini birga sozlayotganimizda ko'rib chiqamiz.
-  const [failedAttempts, setFailedAttempts] = useState(0);
-  const [lockedUntil, setLockedUntil] = useState(0);
+  const [loginBusy, setLoginBusy] = useState(false);
 
   const [adminTab, setAdminTab] = useState("employees");
   const [newEmp, setNewEmp] = useState({ name: "", username: "", password: "", dailyWage: "" });
@@ -2223,49 +2375,98 @@ function WorkforceAppInner() {
   const [fontScale, setFontScale] = useState(100);
   const [lang, setLang] = useState("uz");
 
+  // ============================================================================
+  // MA'LUMOTLARNI YUKLASH — endi app_storage o'rniga real Supabase Auth +
+  // profiles/attendance/advances jadvallaridan o'qiladi (RLS himoyasi bilan).
+  // ============================================================================
+
+  async function loadAllData(sessionUser) {
+    // 1) O'z profilimni olamiz (rolimni aniqlash uchun)
+    const { data: myProfile, error: myErr } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", sessionUser.id)
+      .single();
+    if (myErr || !myProfile) {
+      await supabase.auth.signOut();
+      setCurrentUserState(null);
+      setLoading(false);
+      return;
+    }
+
+    if (myProfile.role === "admin") {
+      const { data: employeesRaw } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("owner_id", sessionUser.id);
+      const employees = (employeesRaw || []).map((e) => ({
+        id: e.id, name: e.display_name || e.username, username: e.username,
+        dailyWage: Number(e.daily_wage || 0), avatar: e.avatar_url,
+        owner: myProfile.username, wageHistory: e.wage_history || [],
+      }));
+      const empIds = employees.map((e) => e.id);
+
+      const attMap = {};
+      const advMap = {};
+      if (empIds.length > 0) {
+        const { data: attRows } = await supabase.from("attendance").select("*").in("employee_id", empIds);
+        (attRows || []).forEach((r) => {
+          if (!attMap[r.employee_id]) attMap[r.employee_id] = {};
+          attMap[r.employee_id][r.date] = { v: Number(r.status), wage: Number(r.wage_at_time) };
+        });
+        const { data: advRows } = await supabase.from("advances").select("*").in("employee_id", empIds).order("created_at", { ascending: true });
+        (advRows || []).forEach((r) => {
+          if (!advMap[r.employee_id]) advMap[r.employee_id] = [];
+          advMap[r.employee_id].push({ id: r.id, amount: Number(r.amount), date: r.date, note: r.note, type: r.type });
+        });
+      }
+
+      setUsersData({
+        admins: { [myProfile.username]: { avatar: myProfile.avatar_url } },
+        employees,
+      });
+      setAttendance(attMap);
+      setAdvances(advMap);
+      setCurrentUserState({ role: "admin", name: makeT(lang)("admin"), username: myProfile.username, id: myProfile.id });
+      await loadNotifications(myProfile.id);
+    } else {
+      // Ishchi: o'z ma'lumotlarini va admin (owner)ining avatarini olamiz
+      const { data: ownerProfile } = await supabase.from("profiles").select("username").eq("id", myProfile.owner_id).maybeSingle();
+      const emp = {
+        id: myProfile.id, name: myProfile.display_name || myProfile.username, username: myProfile.username,
+        dailyWage: Number(myProfile.daily_wage || 0), avatar: myProfile.avatar_url,
+        owner: ownerProfile?.username || "", wageHistory: myProfile.wage_history || [],
+      };
+      const { data: attRows } = await supabase.from("attendance").select("*").eq("employee_id", myProfile.id);
+      const attMap = {};
+      (attRows || []).forEach((r) => { attMap[r.date] = { v: Number(r.status), wage: Number(r.wage_at_time) }; });
+      const { data: advRows } = await supabase.from("advances").select("*").eq("employee_id", myProfile.id).order("created_at", { ascending: true });
+      const advList = (advRows || []).map((r) => ({ id: r.id, amount: Number(r.amount), date: r.date, note: r.note, type: r.type }));
+
+      setUsersData({ admins: {}, employees: [emp] });
+      setAttendance({ [myProfile.id]: attMap });
+      setAdvances({ [myProfile.id]: advList });
+      setCurrentUserState({ role: "employee", id: myProfile.id, name: emp.name, owner: emp.owner });
+    }
+    setLoading(false);
+  }
+
   useEffect(() => {
-    init();
-    // FIX: avvalgi versiyada 4 soniyadan keyin usersData hali null bo'lsa ham
-    // majburan loading=false qilib qo'yardi. Agar internet sekin bo'lsa yoki
-    // init() biror sababdan hali tugamagan bo'lsa, keyingi render'da
-    // usersData.admins[...] kabi joylarda "Cannot read properties of null"
-    // xatosi bilan butun ilova oq ekran bo'lib qolardi.
-    // Endi: agar shu muddatda usersData hali kelmagan bo'lsa, loading emas,
-    // initTimedOut holatiga o'tamiz — foydalanuvchiga aniq xabar va
-    // "qayta urinish" tugmasi ko'rsatiladi, ilova esa qulamaydi.
-    const timer = setTimeout(() => {
-      setInitTimedOut(true);
-    }, 8000);
-    return () => clearTimeout(timer);
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setSession(data.session);
+      if (data.session) loadAllData(data.session.user);
+      else setLoading(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
-    const channel = supabase
-      .channel("app_storage_live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "app_storage" },
-        (payload) => {
-          const row = payload.new;
-          if (!row || typeof row.value === "undefined") return;
-          try {
-            if (row.key === "users-data") setUsersData(JSON.parse(row.value));
-            else if (row.key === "attendance-data") setAttendance(JSON.parse(row.value));
-            else if (row.key === "advances-data") setAdvances(JSON.parse(row.value));
-          } catch (e) {
-          }
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("app-mode", mode);
-    } catch (e) {}
+    try { localStorage.setItem("app-mode", mode); } catch (e) {}
   }, [mode]);
 
   useEffect(() => {
@@ -2279,156 +2480,116 @@ function WorkforceAppInner() {
     };
   }, [fontScale]);
 
+  // Realtime: davomat/avans/profil o'zgarishlarini kuzatish
+  useEffect(() => {
+    if (!currentUser || !session) return;
+    const channel = supabase
+      .channel(`live_${currentUser.role}_${currentUser.id || currentUser.username}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () => loadAllData(session.user))
+      .on("postgres_changes", { event: "*", schema: "public", table: "advances" }, () => loadAllData(session.user))
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => loadAllData(session.user))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentUser?.username, session?.user?.id]);
+
   useEffect(() => {
     if (!currentUser || currentUser.role !== "admin") return;
-    loadNotifications(currentUser.username);
-
     const channel = supabase
-      .channel(`notif_${currentUser.username}`)
+      .channel(`notif_${currentUser.id}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `admin_username=eq.${currentUser.username}` },
-        (payload) => {
-          setNotifications((prev) => [payload.new, ...prev]);
-        }
+        { event: "INSERT", schema: "public", table: "notifications", filter: `admin_id=eq.${currentUser.id}` },
+        (payload) => setNotifications((prev) => [payload.new, ...prev])
       )
       .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUser?.id]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentUser]);
-
-  async function init() {
-    setInitTimedOut(false); // FIX: qayta urinishda eski xato holatini tozalaymiz
-    let usersVal = null;
-    try {
-      const raw = await safeGet("users-data");
-      usersVal = raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      usersVal = null;
-    }
-    if (!usersVal) {
-      usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: [] };
-      await safeSet("users-data", JSON.stringify(usersVal));
-    } else if (usersVal.admin && !usersVal.admins) {
-      const owner = usersVal.admin.username;
-      usersVal = {
-        admins: { [owner]: { password: usersVal.admin.password, avatar: usersVal.admin.avatar || null } },
-        employees: (usersVal.employees || []).map((e) => ({ ...e, owner })),
-      };
-      await safeSet("users-data", JSON.stringify(usersVal));
-    } else if (!usersVal.admins) {
-      usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: usersVal.employees || [] };
-      await safeSet("users-data", JSON.stringify(usersVal));
-    }
-    setUsersData(usersVal);
-
-    setCurrentUserState((prevUser) => {
-      if (!prevUser) return prevUser;
-      const stillValid = prevUser.role === "admin"
-        ? !!usersVal.admins[prevUser.username]
-        : (usersVal.employees || []).some((e) => e.id === prevUser.id);
-      if (!stillValid) {
-        try { localStorage.removeItem("current-user"); } catch (e) {}
-        return null;
-      }
-      return prevUser;
-    });
-
-    try {
-      const rawAtt = await safeGet("attendance-data");
-      setAttendance(rawAtt ? JSON.parse(rawAtt) : {});
-    } catch (e) {
-      setAttendance({});
-    }
-
-    try {
-      const rawAdv = await safeGet("advances-data");
-      setAdvances(rawAdv ? JSON.parse(rawAdv) : {});
-    } catch (e) {
-      setAdvances({});
-    }
-
-    setLoading(false);
+  async function loadNotifications(adminId) {
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("admin_id", adminId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    setNotifications(data || []);
   }
 
-  async function persistUsers(data) {
-    setUsersData(data);
-    await safeSet("users-data", JSON.stringify(data));
-  }
-  async function persistAttendance(data) {
-    setAttendance(data);
-    await safeSet("attendance-data", JSON.stringify(data));
-  }
-  async function persistAdvances(data) {
-    setAdvances(data);
-    await safeSet("advances-data", JSON.stringify(data));
+  async function markAllNotificationsRead() {
+    if (!currentUser || currentUser.role !== "admin") return;
+    await supabase.from("notifications").update({ is_read: true }).eq("admin_id", currentUser.id).eq("is_read", false);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }
 
-  function handleLogin() {
+  // ============================================================================
+  // LOGIN / RO'YXATDAN O'TISH
+  // ============================================================================
+
+  async function handleLogin() {
     setLoginError("");
-    if (Date.now() < lockedUntil) {
-      const secsLeft = Math.ceil((lockedUntil - Date.now()) / 1000);
-      setLoginError(
-        lang === "ru" ? `Слишком много попыток. Подождите ${secsLeft} сек.` :
-        lang === "en" ? `Too many attempts. Wait ${secsLeft}s.` :
-        `Juda ko'p urinish. ${secsLeft} soniya kuting.`
-      );
+    const username = loginForm.username.trim();
+    const password = loginForm.password;
+    if (!username || !password) {
+      setLoginError(makeT(lang)("wrongLogin"));
       return;
     }
+    setLoginBusy(true);
     try {
-      const username = loginForm.username.trim();
-      const password = loginForm.password;
-      const admins = (usersData && usersData.admins) ? usersData.admins : { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password } };
-      const employees = (usersData && usersData.employees) ? usersData.employees : [];
-
-      const emp = employees.find((x) => x.username === username && x.password === password);
-      if (emp) {
-        setFailedAttempts(0);
-        setCurrentUser({ role: "employee", id: emp.id, name: emp.name, owner: emp.owner });
+      const { data: email, error: lookupErr } = await supabase.rpc("email_for_username", { p_username: username });
+      if (lookupErr || !email) {
+        setLoginError(makeT(lang)("wrongLogin"));
+        setLoginBusy(false);
         return;
       }
-      if (admins[username] && admins[username].password === password) {
-        setFailedAttempts(0);
-        setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username });
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInErr || !signInData?.session) {
+        setLoginError(makeT(lang)("wrongLogin"));
+        setLoginBusy(false);
         return;
       }
-
-      setFailedAttempts((prev) => {
-        const next = prev + 1;
-        if (next >= 5) {
-          setLockedUntil(Date.now() + 30000);
-          return 0;
-        }
-        return next;
-      });
-      setLoginError(makeT(lang)("wrongLogin"));
+      setSession(signInData.session);
+      await loadAllData(signInData.session.user);
     } catch (err) {
       setLoginError(String(err && err.message ? err.message : err));
     }
+    setLoginBusy(false);
   }
 
-  function registerAdmin(newUsername, newPassword) {
-    const admins = usersData.admins || {};
-    if (!newUsername || !newUsername.trim()) return { error: makeT(lang)("errEmptyLogin") };
-    const uname = newUsername.trim();
-    if (admins[uname] || usersData.employees.some((e) => e.username === uname)) {
-      return { error: makeT(lang)("errLoginTaken") };
+  async function registerAdmin(newUsername, newPassword) {
+    try {
+      const { data, error } = await supabase.functions.invoke("register-admin", {
+        body: { username: newUsername, password: newPassword },
+      });
+      if (error || data?.error) {
+        return { error: data?.error || String(error?.message || error) };
+      }
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: `${newUsername.toLowerCase()}@nazoratplus.internal`,
+        password: newPassword,
+      });
+      if (signInErr || !signInData?.session) {
+        return { error: "Ro'yxatdan o'tildi, lekin avtomatik kirishda xato. Iltimos, qo'lda kiring." };
+      }
+      setSession(signInData.session);
+      await loadAllData(signInData.session.user);
+      return { recoveryCode: data.recoveryCode || null };
+    } catch (err) {
+      return { error: String(err && err.message ? err.message : err) };
     }
-    if (!newPassword || newPassword.length < 4) {
-      return { error: makeT(lang)("errShortPassword") };
-    }
-    const updated = { ...usersData, admins: { ...admins, [uname]: { password: newPassword, avatar: null } } };
-    persistUsers(updated);
-    setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username: uname });
-    return {};
   }
 
   function logout() {
-    setCurrentUser(null);
+    supabase.auth.signOut();
+    setCurrentUserState(null);
+    setUsersData(null);
+    setSession(null);
     setLoginForm({ username: "", password: "" });
   }
+
+  // ============================================================================
+  // HISOB-KITOB (o'zgarmagan)
+  // ============================================================================
 
   function summaryFor(empId) {
     const emp = usersData.employees.find((x) => x.id === empId);
@@ -2448,165 +2609,153 @@ function WorkforceAppInner() {
     return { emp, workedDays, totalWage, totalAdvance, totalAvans, totalSalaryPaid, remaining: totalWage - totalAdvance, advList, att };
   }
 
+  // ============================================================================
+  // ISHCHILARNI BOSHQARISH — endi Edge Function + RPC orqali
+  // ============================================================================
+
   async function addEmployee() {
     setEmpError("");
     if (!newEmp.name || !newEmp.username || !newEmp.password || !newEmp.dailyWage) {
       setEmpError(makeT(lang)("fillAllFields"));
-      return;
+      return false;
     }
-    if (usersData.employees.some((x) => x.username === newEmp.username) || Object.keys(usersData.admins).includes(newEmp.username)) {
-      setEmpError(makeT(lang)("errLoginTaken"));
-      return;
-    }
-    const id = "e" + Date.now();
-    const wage = Number(newEmp.dailyWage);
-    const updated = {
-      ...usersData,
-      employees: [...usersData.employees, {
-        id, name: newEmp.name, username: newEmp.username,
-        password: newEmp.password, dailyWage: wage, avatar: null,
-        owner: currentUser.username,
-        wageHistory: [{ date: todayISO(), wage }],
-      }],
-    };
-    await persistUsers(updated);
-    setNewEmp({ name: "", username: "", password: "", dailyWage: "" });
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
+    const { data, error } = await supabase.functions.invoke("create-employee", {
+      body: { name: newEmp.name, username: newEmp.username, password: newEmp.password, dailyWage: Number(newEmp.dailyWage) },
     });
+    if (error || data?.error) {
+      setEmpError(data?.error || String(error?.message || error));
+      return false;
+    }
+    setNewEmp({ name: "", username: "", password: "", dailyWage: "" });
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    await loadAllData(session.user);
+    return true;
   }
 
   async function deleteEmployee(id) {
-    const target = usersData.employees.find((x) => x.id === id);
-    if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
-    await persistUsers({ ...usersData, employees: usersData.employees.filter((x) => x.id !== id) });
-    const att2 = { ...attendance }; delete att2[id]; await persistAttendance(att2);
-    const adv2 = { ...advances }; delete adv2[id]; await persistAdvances(adv2);
+    const { error } = await supabase.functions.invoke("delete-employee", { body: { employeeId: id } });
+    if (error) { console.error(error); return; }
     if (advEmp === id) setAdvEmp("");
+    await loadAllData(session.user);
   }
 
   async function updateEmployeeWage(id, newWage) {
-    const target = usersData.employees.find((x) => x.id === id);
-    if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
-    const today = todayISO();
-    const history = Array.isArray(target.wageHistory) && target.wageHistory.length > 0
-      ? target.wageHistory
-      : [{ date: "2000-01-01", wage: target.dailyWage }];
-    const withoutToday = history.filter((h) => h.date !== today);
-    const newHistory = [...withoutToday, { date: today, wage: newWage }].sort((a, b) => (a.date < b.date ? -1 : 1));
-    const employees = usersData.employees.map((e) => (e.id === id ? { ...e, dailyWage: newWage, wageHistory: newHistory } : e));
-    await persistUsers({ ...usersData, employees });
+    const { error } = await supabase.rpc("admin_update_employee_wage", { p_employee_id: id, p_new_wage: newWage });
+    if (error) { console.error(error); return; }
+    await loadAllData(session.user);
   }
 
-  async function markAttendance(empId, status) {
-    if (attDate > todayISO()) return;
-    const dayMap = { ...(attendance[empId] || {}) };
-    const currentStatus = attEntryStatus(dayMap[attDate]);
-    if (dayMap[attDate] !== undefined && currentStatus === status) {
-      delete dayMap[attDate];
-    } else {
-      const emp = usersData.employees.find((e) => e.id === empId);
-      dayMap[attDate] = { v: status, wage: Number(emp ? emp.dailyWage : 0) };
-    }
-    await persistAttendance({ ...attendance, [empId]: dayMap });
-  }
-
-  // Ommaviy belgilash: har bir ishchi uchun wage history'dan (o'sha kunga mos)
-  // stavkani oladi — hozirgi (joriy) stavka emas, shu tufayli stavka o'zgargan
-  // bo'lsa ham eski kunlar to'g'ri hisoblanadi.
-  async function bulkMarkAttendance(empIds, status) {
-    if (attDate > todayISO()) return;
-    const updated = { ...attendance };
-    empIds.forEach((id) => {
-      const emp = usersData.employees.find((e) => e.id === id);
-      const wage = emp ? wageForDate(emp, attDate) : 0;
-      const dayMap = { ...(updated[id] || {}) };
-      dayMap[attDate] = { v: status, wage: Number(wage || 0) };
-      updated[id] = dayMap;
+  async function resetEmployeePassword(id, newPassword) {
+    const { data, error } = await supabase.functions.invoke("reset-employee-password", {
+      body: { employeeId: id, newPassword },
     });
-    await persistAttendance(updated);
-  }
-
-  async function addAdvance() {
-    // FIX: avvalgi tekshiruv `!advForm.amount` edi — bu "0" satrini ham
-    // "bo'sh" deb hisoblamas edi (chunki "0" == false emas, lekin bo'sh
-    // satr ""ni tekshirish kifoya emas edi), shu sabab summasi 0 bo'lgan
-    // avans ham ro'yxatga qo'shilib ketishi mumkin edi. Endi aniq son va
-    // 0 dan katta ekanini tekshiramiz.
-    const amountNum = Number(advForm.amount);
-    if (!advEmp || !advForm.amount || !Number.isFinite(amountNum) || amountNum <= 0) return;
-    const list = advances[advEmp] ? [...advances[advEmp]] : [];
-    list.push({ id: "a" + Date.now(), amount: amountNum, date: advForm.date, note: advForm.note, type: advForm.type || "avans" });
-    await persistAdvances({ ...advances, [advEmp]: list });
-    setAdvForm({ amount: "", date: todayISO(), note: "", type: advForm.type || "avans" });
-  }
-
-  async function deleteAdvance(empId, advId) {
-    const list = (advances[empId] || []).filter((a) => a.id !== advId);
-    await persistAdvances({ ...advances, [empId]: list });
-  }
-
-  function changeOwnCredentials(newUsername, newPassword) {
-    if (!currentUser) return { error: "—" };
-    if (currentUser.role === "admin") {
-      const oldUsername = currentUser.username;
-      const taken = newUsername !== oldUsername &&
-        (Object.keys(usersData.admins).includes(newUsername) || usersData.employees.some((e) => e.username === newUsername));
-      if (taken) return { error: makeT(lang)("errLoginTaken") };
-      const admins = { ...usersData.admins };
-      const data = admins[oldUsername];
-      delete admins[oldUsername];
-      admins[newUsername] = { ...data, password: newPassword };
-      const employees = usersData.employees.map((e) => (e.owner === oldUsername ? { ...e, owner: newUsername } : e));
-      persistUsers({ ...usersData, admins, employees });
-      setCurrentUser({ role: "admin", name: currentUser.name, username: newUsername });
-      return {};
-    }
-    const taken = usersData.employees.some((e) => e.id !== currentUser.id && e.username === newUsername) || Object.keys(usersData.admins).includes(newUsername);
-    if (taken) return { error: makeT(lang)("errLoginTaken") };
-    const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, username: newUsername, password: newPassword } : e));
-    persistUsers({ ...usersData, employees });
-    setCurrentUser({ role: "employee", id: currentUser.id, name: currentUser.name, owner: currentUser.owner });
+    if (error || data?.error) return { error: data?.error || String(error?.message || error) };
     return {};
   }
 
-  async function deleteOwnAccount() {
-    if (!currentUser) return;
-    if (currentUser.role === "admin") {
-      const admins = { ...usersData.admins };
-      delete admins[currentUser.username];
-      const ownedIds = usersData.employees.filter((e) => e.owner === currentUser.username).map((e) => e.id);
-      const employees = usersData.employees.filter((e) => e.owner !== currentUser.username);
-      await persistUsers({ ...usersData, admins, employees });
-      const att2 = { ...attendance }; ownedIds.forEach((id) => delete att2[id]); await persistAttendance(att2);
-      const adv2 = { ...advances }; ownedIds.forEach((id) => delete adv2[id]); await persistAdvances(adv2);
+  // ============================================================================
+  // DAVOMAT
+  // ============================================================================
+
+  async function markAttendance(empId, status) {
+    if (attDate > todayISO()) return;
+    const currentRaw = attendance[empId]?.[attDate];
+    const currentStatus = currentRaw !== undefined ? attEntryStatus(currentRaw) : null;
+    if (currentStatus === status) {
+      await supabase.from("attendance").delete().eq("employee_id", empId).eq("date", attDate);
     } else {
-      const employees = usersData.employees.filter((e) => e.id !== currentUser.id);
-      await persistUsers({ ...usersData, employees });
-      const att2 = { ...attendance }; delete att2[currentUser.id]; await persistAttendance(att2);
-      const adv2 = { ...advances }; delete adv2[currentUser.id]; await persistAdvances(adv2);
+      const emp = usersData.employees.find((e) => e.id === empId);
+      await supabase.from("attendance").upsert(
+        { employee_id: empId, date: attDate, status, wage_at_time: Number(emp ? emp.dailyWage : 0) },
+        { onConflict: "employee_id,date" }
+      );
     }
+    await loadAllData(session.user);
+  }
+
+  async function bulkMarkAttendance(empIds, status) {
+    if (attDate > todayISO()) return;
+    const rows = empIds.map((id) => {
+      const emp = usersData.employees.find((e) => e.id === id);
+      const wage = emp ? wageForDate(emp, attDate) : 0;
+      return { employee_id: id, date: attDate, status, wage_at_time: Number(wage || 0) };
+    });
+    await supabase.from("attendance").upsert(rows, { onConflict: "employee_id,date" });
+    await loadAllData(session.user);
+  }
+
+  // ============================================================================
+  // AVANS / TO'LOV
+  // ============================================================================
+
+  async function addAdvance() {
+    const amountNum = Number(advForm.amount);
+    if (!advEmp || !advForm.amount || !Number.isFinite(amountNum) || amountNum <= 0) return;
+    await supabase.from("advances").insert({
+      employee_id: advEmp, amount: amountNum, date: advForm.date, note: advForm.note || null, type: advForm.type || "avans",
+    });
+    setAdvForm({ amount: "", date: todayISO(), note: "", type: advForm.type || "avans" });
+    await loadAllData(session.user);
+  }
+
+  async function deleteAdvance(empId, advId) {
+    await supabase.from("advances").delete().eq("id", advId);
+    await loadAllData(session.user);
+  }
+
+  // ============================================================================
+  // PROFIL / XAVFSIZLIK
+  // ============================================================================
+
+  async function verifyCurrentPassword(password) {
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const email = userRes?.user?.email;
+      if (!email) return false;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return !error;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function changeOwnCredentials(newUsername, newPasswordOrNull, currentPassword) {
+    const ok = await verifyCurrentPassword(currentPassword);
+    if (!ok) return { error: makeT(lang)("errWrongCurrentPassword") };
+
+    if (newPasswordOrNull) {
+      const { error: pwErr } = await supabase.auth.updateUser({ password: newPasswordOrNull });
+      if (pwErr) return { error: pwErr.message };
+    }
+    if (currentUser.role === "admin") {
+      const taken = usersData.employees.some((e) => e.username === newUsername) ;
+      // eslint-disable-next-line no-unused-vars
+    }
+    const { error: rpcErr } = await supabase.rpc("update_own_profile", { new_username: newUsername, new_avatar_url: null });
+    if (rpcErr) return { error: rpcErr.message.includes("duplicate") ? makeT(lang)("errLoginTaken") : rpcErr.message };
+
+    await loadAllData(session.user);
+    return {};
+  }
+
+  async function deleteOwnAccount(currentPassword) {
+    const ok = await verifyCurrentPassword(currentPassword);
+    if (!ok) return { error: makeT(lang)("errWrongCurrentPassword") };
+    const { error } = await supabase.functions.invoke("delete-account");
+    if (error) return { error: String(error.message || error) };
     logout();
+    return {};
   }
 
-  async function loadNotifications(adminUsername) {
-    if (!adminUsername) return;
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("admin_username", adminUsername)
-      .order("created_at", { ascending: false })
-      .limit(30);
-    setNotifications(data || []);
+  async function updateAvatar(dataUrl) {
+    const { error } = await supabase.rpc("update_own_profile", { new_username: null, new_avatar_url: dataUrl });
+    if (error) { console.error(error); return; }
+    await loadAllData(session.user);
   }
 
-  async function markAllNotificationsRead(adminUsername) {
-    if (!adminUsername) return;
-    await supabase.from("notifications").update({ is_read: true }).eq("admin_username", adminUsername).eq("is_read", false);
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-  }
+  // ============================================================================
+  // BILDIRISHNOMALAR (push)
+  // ============================================================================
 
   async function enableNotifications() {
     if (!currentUser || currentUser.role !== "admin") return;
@@ -2625,18 +2774,9 @@ function WorkforceAppInner() {
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
       }
-      // FIX: avval har safar "enableNotifications" bosilganda `insert` qilinar edi —
-      // shu sabab bitta foydalanuvchi uchun bir nechta takroriy obuna yig'ilib qolardi.
-      // Endi endpoint bo'yicha upsert qilinadi (Supabase tomonda push_subscriptions
-      // jadvalida subscription->>'endpoint' ustuniga unique index/constraint kerak bo'ladi —
-      // buni Supabase qismini birga qilayotganimizda sozlaymiz).
       const subJson = sub.toJSON();
       await supabase.from("push_subscriptions").upsert(
-        {
-          admin_username: currentUser.username,
-          subscription: subJson,
-          endpoint: subJson.endpoint,
-        },
+        { admin_id: currentUser.id, subscription: subJson, endpoint: subJson.endpoint },
         { onConflict: "endpoint" }
       );
       alert("Bildirishnoma yoqildi!");
@@ -2645,49 +2785,10 @@ function WorkforceAppInner() {
     }
   }
 
-  async function updateAvatar(dataUrl) {
-    if (!currentUser) return;
-    if (currentUser.role === "admin") {
-      const admins = { ...usersData.admins, [currentUser.username]: { ...usersData.admins[currentUser.username], avatar: dataUrl } };
-      await persistUsers({ ...usersData, admins });
-    } else {
-      const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, avatar: dataUrl } : e));
-      await persistUsers({ ...usersData, employees });
-    }
-  }
-
   const t = makeT(lang);
 
   let screen;
-  // FIX: usersData hali null bo'lsa (masalan tarmoq sekin bo'lgani uchun init()
-  // hali tugamagan), currentUser mavjud bo'lsa ham AdminApp/EmployeeApp'ni
-  // render qilmaymiz — aks holda usersData.admins[...] kabi joylarda
-  // "Cannot read properties of null" xatosi bilan ilova qulab tushardi.
-  if (!usersData && initTimedOut) {
-    // FIX: yangi holat — internet/serverga ulanib bo'lmadi, foydalanuvchiga
-    // aniq xabar va qayta urinish imkoni beriladi (oq ekran o'rniga).
-    screen = (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-app)] px-6 text-center">
-        <img src="/logo.svg" alt={t("appName")} className="w-14 h-14 opacity-60" />
-        <div className="text-[var(--text-primary)] font-semibold text-base">
-          {lang === "ru" ? "Не удалось загрузить данные" : lang === "en" ? "Failed to load data" : "Ma'lumotlarni yuklab bo'lmadi"}
-        </div>
-        <div className="text-[var(--text-muted)] text-xs max-w-xs">
-          {lang === "ru" ? "Проверьте подключение к интернету и попробуйте снова." : lang === "en" ? "Check your internet connection and try again." : "Internet aloqasini tekshirib, qayta urinib ko'ring."}
-        </div>
-        <button
-          type="button"
-          onClick={() => { setLoading(true); setInitTimedOut(false); init(); }}
-          className="mt-2 px-5 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold hover:opacity-90 transition-opacity"
-          style={{ backgroundColor: accent }}
-        >
-          {lang === "ru" ? "Повторить" : lang === "en" ? "Retry" : "Qayta urinish"}
-        </button>
-      </div>
-    );
-  } else if (loading || !usersData) {
-    // FIX: hali usersData tayyor bo'lmagan bo'lsa (init() davom etyapti),
-    // currentUser mavjud bo'lsa ham Admin/EmployeeApp render qilinmaydi.
+  if (loading) {
     screen = (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-app)]">
         <img src="/logo.svg" alt={t("appName")} className="w-16 h-16 animate-pulse" />
@@ -2695,12 +2796,13 @@ function WorkforceAppInner() {
         <div className="text-[var(--text-muted)] text-xs">{t("loading")}</div>
       </div>
     );
-  } else if (!currentUser) {
+  } else if (!currentUser || !usersData) {
     screen = (
       <LoginScreen
         loginForm={loginForm}
         setLoginForm={setLoginForm}
         loginError={loginError}
+        loginBusy={loginBusy}
         onSubmit={handleLogin}
         onRegister={registerAdmin}
       />
@@ -2720,6 +2822,7 @@ function WorkforceAppInner() {
         addEmployee={addEmployee}
         deleteEmployee={deleteEmployee}
         updateEmployeeWage={updateEmployeeWage}
+        resetEmployeePassword={resetEmployeePassword}
         attendance={attendance}
         attDate={attDate}
         setAttDate={setAttDate}
