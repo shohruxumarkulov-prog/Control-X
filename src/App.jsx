@@ -545,64 +545,102 @@ function RecoveryCodeModal({ code, onClose }) {
   );
 }
 
-function AdminRecoveryForm({ onDone, onBack }) {
-  const [step, setStep] = useState("code"); // code -> newPassword yoki done
+// YANGI: Telegram bot orqali parolni tiklash — ADMIN ham, ISHCHI ham shu bitta
+// formadan foydalanadi. Avval login kiritiladi (agar Telegram ulangan bo'lsa,
+// botga 6 xonali kod yuboriladi), keyin kod + yangi parol kiritiladi.
+function TelegramResetForm({ onBack }) {
+  const [step, setStep] = useState("username"); // username -> code -> done
   const [username, setUsername] = useState("");
-  const [recoveryCode, setRecoveryCode] = useState("");
+  const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
-  const [newRecoveryCode, setNewRecoveryCode] = useState(null);
+  const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
 
-  async function submit() {
+  async function submitUsername() {
     setError("");
-    if (!username.trim() || !recoveryCode.trim()) { setError("Login va tiklash kodini kiriting"); return; }
-    if (!newPassword || newPassword.length < 6) { setError("Yangi parol kamida 6 belgidan iborat bo'lsin"); return; }
+    if (!username.trim()) { setError("Login kiritilmagan"); return; }
     setBusy(true);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("reset-admin-password", {
-        body: { username: username.trim(), recoveryCode: recoveryCode.trim(), newPassword },
-      });
-      if (fnError || data?.error) {
-        setError(data?.error || "Xato yuz berdi");
-        setBusy(false);
-        return;
-      }
-      setNewRecoveryCode(data.newRecoveryCode);
+      const { error: fnErr } = await supabase.functions.invoke("request-password-reset", { body: { username: username.trim() } });
       setBusy(false);
+      if (fnErr) { setError(String(fnErr.message || fnErr)); return; }
+      setInfo("Agar Telegram ulangan bo'lsa, kod shu botga yuborildi. Telegramni tekshiring va kodni kiriting.");
+      setStep("code");
     } catch (e) {
-      setError(String(e?.message || e));
       setBusy(false);
+      setError(String(e?.message || e));
     }
   }
 
-  if (newRecoveryCode) {
+  async function submitCode() {
+    setError("");
+    if (!code.trim()) { setError("Kodni kiriting"); return; }
+    if (!newPassword || newPassword.length < 6) { setError("Yangi parol kamida 6 belgidan iborat bo'lsin"); return; }
+    setBusy(true);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke("confirm-password-reset", {
+        body: { username: username.trim(), code: code.trim(), newPassword },
+      });
+      setBusy(false);
+      if (fnErr || data?.error) { setError(data?.error || String(fnErr?.message || fnErr)); return; }
+      setStep("done");
+    } catch (e) {
+      setBusy(false);
+      setError(String(e?.message || e));
+    }
+  }
+
+  if (step === "done") {
     return (
-      <RecoveryCodeModal
-        code={newRecoveryCode}
-        onClose={() => onDone()}
-      />
+      <div className="space-y-3 text-center">
+        <p className="text-sm" style={{ color: "#2f9463" }}>Parol muvaffaqiyatli yangilandi! Endi yangi parol bilan kiring.</p>
+        <button type="button" onClick={onBack} className="w-full py-2.5 rounded-lg text-xs font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
+          Kirish sahifasiga qaytish
+        </button>
+      </div>
+    );
+  }
+
+  if (step === "code") {
+    return (
+      <div className="space-y-3">
+        {info && <p className="text-xs text-center leading-snug" style={{ color: "#6a6a6a" }}>{info}</p>}
+        <IconInput icon={<KeyRound size={17} />} value={code} onChange={setCode} placeholder="Telegramdagi 6 xonali kod" />
+        <IconInput icon={<Lock size={17} />} type="password" value={newPassword} onChange={setNewPassword} placeholder="Yangi parol" />
+        {error && <p className="text-xs text-center" style={{ color: "#a10f0f" }}>{error}</p>}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={submitCode}
+          className="w-full py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest text-[#f5e9c8] disabled:opacity-60"
+          style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
+        >
+          {busy ? "Yuborilmoqda..." : "Parolni tiklash"}
+        </button>
+        <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>Ortga</button>
+      </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <IconInput icon={<UserIcon size={17} />} value={username} onChange={setUsername} placeholder="Login" />
-      <IconInput icon={<KeyRound size={17} />} value={recoveryCode} onChange={setRecoveryCode} placeholder="Tiklash kodi (XXXX-XXXX-...)" />
-      <IconInput icon={<Lock size={17} />} type="password" value={newPassword} onChange={setNewPassword} placeholder="Yangi parol" />
+      <p className="text-center text-sm mb-1 leading-snug" style={{ color: "#6a6a6a" }}>
+        Login kiriting — agar Telegram ulangan bo'lsa, tiklash kodi shu yerga yuboriladi.
+      </p>
+      <IconInput icon={<UserIcon size={17} />} value={username} onChange={setUsername} placeholder="Login" autoFocus />
       {error && <p className="text-xs text-center" style={{ color: "#a10f0f" }}>{error}</p>}
       <button
         type="button"
         disabled={busy}
-        onClick={submit}
+        onClick={submitUsername}
         className="w-full py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest text-[#f5e9c8] disabled:opacity-60"
         style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
       >
-        {busy ? "Yuborilmoqda..." : "Parolni tiklash"}
+        {busy ? "Yuborilmoqda..." : "Kodni yuborish"}
       </button>
-      <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>
-        Ortga
-      </button>
+      <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>Ortga</button>
     </div>
   );
 }
@@ -720,29 +758,8 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
         <div className="w-full max-w-sm">
           <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
-            {forgotMode === "choose" && (
-              <div className="space-y-3">
-                <p className="text-center text-sm mb-4" style={{ color: "#6a6a6a" }}>Siz kimsiz?</p>
-                <button type="button" onClick={() => setForgotMode("employee")} className="w-full py-3 rounded-2xl text-sm font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
-                  {t("roleTabEmployee")}
-                </button>
-                <button type="button" onClick={() => setForgotMode("admin")} className="w-full py-3 rounded-2xl text-sm font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
-                  {t("roleTabAdmin")}
-                </button>
-                <button type="button" onClick={() => setForgotMode(null)} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>{t("cancel")}</button>
-              </div>
-            )}
-            {forgotMode === "employee" && (
-              <div className="space-y-3 text-center">
-                <p className="text-sm leading-snug" style={{ color: "#6a6a6a" }}>{t("forgotPasswordHint")}</p>
-                <button type="button" onClick={() => setForgotMode(null)} className="w-full py-2.5 rounded-lg text-xs font-medium mt-2" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
-                  {t("cancel")}
-                </button>
-              </div>
-            )}
-            {forgotMode === "admin" && (
-              <AdminRecoveryForm onDone={() => setForgotMode(null)} onBack={() => setForgotMode(null)} />
-            )}
+            <h2 className="text-center text-lg font-bold mb-4" style={{ color: "#4a4a4a" }}>Parolni tiklash</h2>
+            <TelegramResetForm onBack={() => setForgotMode(null)} />
           </div>
         </div>
       </div>
@@ -789,7 +806,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
             </div>
             <button
               type="button"
-              onClick={() => setForgotMode("choose")}
+              onClick={() => setForgotMode(true)}
               className="text-xs font-medium transition-colors hover:opacity-80"
               style={{ color: "#929191" }}
             >
@@ -1137,9 +1154,19 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
 
 function ProfileDrawer({
   open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
-  changeOwnCredentials, updateAvatar, enableNotifications,
+  changeOwnCredentials, updateAvatar, enableNotifications, linkTelegram,
   accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
+  const [tgBusy, setTgBusy] = useState(false);
+  const [tgMsg, setTgMsg] = useState("");
+  async function handleLinkTelegram() {
+    setTgBusy(true);
+    setTgMsg("");
+    const result = await linkTelegram();
+    setTgBusy(false);
+    if (result && result.error) setTgMsg(result.error);
+    else setTgMsg("Telegram ochildi — u yerda \"Start\" tugmasini bosing.");
+  }
   const { t } = useApp();
   const fileRef = useRef(null);
   const [page, setPage] = useState(null);
@@ -1355,6 +1382,8 @@ function ProfileDrawer({
         {page === "privacy" && (
           <div className="px-5">
             <MenuRow icon={<KeyRound size={18} className="text-[var(--accent)]" />} label={t("updateCredentials")} onClick={() => setPage("credentials")} />
+            <MenuRow icon={<Send size={18} className="text-[#2aa9de]" />} label={tgBusy ? t("loading") : "Telegramga ulash (parolni tiklash uchun)"} onClick={handleLinkTelegram} />
+            {tgMsg && <p className="text-[var(--text-secondary)] text-xs pb-3 -mt-1">{tgMsg}</p>}
             {isAdmin && (
               <MenuRow icon={<Send size={18} className="text-[var(--good)]" />} label={t("enableNotifications")} onClick={enableNotifications} />
             )}
@@ -1466,7 +1495,7 @@ function AdminApp({
   attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
-  notifications, markAllNotificationsRead,
+  notifications, markAllNotificationsRead, linkTelegram,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1578,6 +1607,7 @@ function AdminApp({
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
         enableNotifications={enableNotifications}
+        linkTelegram={linkTelegram}
       />
       <NotificationPanel
         open={notifOpen}
@@ -2043,7 +2073,7 @@ function AdminApp({
 
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, linkTelegram,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [empTab, setEmpTab] = useState("umumiy");
@@ -2145,6 +2175,7 @@ function EmployeeApp({
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        linkTelegram={linkTelegram}
       />
       <Shell
         title={t("employeePanel")}
@@ -2757,6 +2788,19 @@ function WorkforceAppInner() {
   // BILDIRISHNOMALAR (push)
   // ============================================================================
 
+  async function linkTelegram() {
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-link-start");
+      if (error || data?.error) {
+        return { error: data?.error || String(error?.message || error) };
+      }
+      window.open(data.linkUrl, "_blank");
+      return {};
+    } catch (e) {
+      return { error: String(e?.message || e) };
+    }
+  }
+
   async function enableNotifications() {
     if (!currentUser || currentUser.role !== "admin") return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -2845,6 +2889,7 @@ function WorkforceAppInner() {
         enableNotifications={enableNotifications}
         notifications={notifications}
         markAllNotificationsRead={markAllNotificationsRead}
+        linkTelegram={linkTelegram}
       />
     );
   } else {
@@ -2861,6 +2906,7 @@ function WorkforceAppInner() {
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        linkTelegram={linkTelegram}
       />
     );
   }
