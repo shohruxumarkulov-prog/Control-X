@@ -656,7 +656,6 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const [showForgotHint, setShowForgotHint] = useState(false);
   const [forgotMode, setForgotMode] = useState(null); // null | 'choose' | 'employee' | 'admin'
   const [btnHover, setBtnHover] = useState(false);
-  const [recoveryCode, setRecoveryCode] = useState(null);
   const { t } = useApp();
 
   async function submitRegister() {
@@ -672,23 +671,15 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
       setRegError(result.error);
       return;
     }
-    if (result && result.recoveryCode) {
-      setRecoveryCode(result.recoveryCode);
-    }
+    // Muvaffaqiyat: parent (WorkforceAppInner) currentUser'ni allaqachon o'rnatgan
+    // bo'ladi va ekranni AdminApp'ga almashtiradi; tiklash kodi/Telegram taklifi
+    // endi shu yerda emas, dastur darajasida (global overlay sifatida) ko'rsatiladi.
   }
 
   const cardShadow = "-22px -22px 44px #ffffff, 22px 22px 50px #c3c3c3";
   const titleShadow = "1px 1px 1px rgba(255,255,255,0.9), -2px -2px 1px rgba(163,163,163,0.25)";
   const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
   const btnShadowHover = "0 10px 22px rgba(20,60,140,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
-
-  if (recoveryCode) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
-        <RecoveryCodeModal code={recoveryCode} onClose={() => { setRecoveryCode(null); setRegistering(false); }} />
-      </div>
-    );
-  }
 
   if (registering) {
     return (
