@@ -502,6 +502,66 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, 
   );
 }
 
+function TelegramPromptModal({ phase, onLink, onSkip, busy }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
+      <div className="w-full max-w-sm bg-[var(--bg-panel)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl text-center">
+        {phase === "success" ? (
+          <>
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
+              style={{ backgroundColor: "var(--good-soft)" }}
+            >
+              <Check size={28} style={{ color: "var(--good)" }} />
+            </div>
+            <div className="text-[var(--text-primary)] font-semibold text-base mb-1">Xush kelibsiz!</div>
+            <p className="text-[var(--text-secondary)] text-xs">Telegram muvaffaqiyatli ulandi.</p>
+          </>
+        ) : phase === "waiting" ? (
+          <>
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse"
+              style={{ backgroundColor: "rgba(42,169,222,0.15)" }}
+            >
+              <Send size={24} style={{ color: "#2aa9de" }} />
+            </div>
+            <div className="text-[var(--text-primary)] font-semibold text-base mb-1.5">Telegramda kuting...</div>
+            <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
+              Ochilgan botga o'ting va "Start" tugmasini bosing — bosishingiz bilan bu oyna avtomatik davom etadi.
+            </p>
+            <button type="button" onClick={onSkip} className="w-full py-2 text-xs font-medium text-[var(--text-muted)]">
+              Keyinroq
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-center gap-2 text-[var(--text-primary)] font-semibold text-base mb-1.5">
+              <Send size={18} className="text-[#2aa9de]" /> Xush kelibsiz!
+            </div>
+            <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
+              Parolni (yoki loginni) unutib qolsangiz tiklay olishingiz uchun, hisobingizni Telegram botga ulab qo'ying — bir necha soniya vaqt oladi.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onLink}
+                className="w-full py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+                style={{ backgroundColor: "#2aa9de" }}
+              >
+                {busy ? "..." : "Telegramga ulash"}
+              </button>
+              <button type="button" onClick={onSkip} className="w-full py-2 text-xs font-medium text-[var(--text-muted)]">
+                Keyinroq
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RecoveryCodeModal({ code, onClose }) {
   const [copied, setCopied] = useState(false);
   async function doCopy() {
@@ -545,64 +605,157 @@ function RecoveryCodeModal({ code, onClose }) {
   );
 }
 
-function AdminRecoveryForm({ onDone, onBack }) {
-  const [step, setStep] = useState("code"); // code -> newPassword yoki done
+// YANGI: Telegram bot orqali parolni tiklash — ADMIN ham, ISHCHI ham shu bitta
+// formadan foydalanadi. Avval login kiritiladi (agar Telegram ulangan bo'lsa,
+// botga 6 xonali kod yuboriladi), keyin kod + yangi parol kiritiladi.
+function TelegramResetForm({ onBack }) {
+  const [step, setStep] = useState("username"); // username -> code -> done
   const [username, setUsername] = useState("");
-  const [recoveryCode, setRecoveryCode] = useState("");
+  const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
-  const [newRecoveryCode, setNewRecoveryCode] = useState(null);
+  const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
 
-  async function submit() {
+  async function submitUsername() {
     setError("");
-    if (!username.trim() || !recoveryCode.trim()) { setError("Login va tiklash kodini kiriting"); return; }
-    if (!newPassword || newPassword.length < 6) { setError("Yangi parol kamida 6 belgidan iborat bo'lsin"); return; }
+    if (!username.trim()) { setError("Login kiritilmagan"); return; }
     setBusy(true);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("reset-admin-password", {
-        body: { username: username.trim(), recoveryCode: recoveryCode.trim(), newPassword },
-      });
-      if (fnError || data?.error) {
-        setError(data?.error || "Xato yuz berdi");
-        setBusy(false);
-        return;
-      }
-      setNewRecoveryCode(data.newRecoveryCode);
+      const { error: fnErr } = await supabase.functions.invoke("request-password-reset", { body: { username: username.trim() } });
       setBusy(false);
+      if (fnErr) { setError(String(fnErr.message || fnErr)); return; }
+      setInfo("Agar Telegram ulangan bo'lsa, kod shu botga yuborildi. Telegramni tekshiring va kodni kiriting.");
+      setStep("code");
     } catch (e) {
-      setError(String(e?.message || e));
       setBusy(false);
+      setError(String(e?.message || e));
     }
   }
 
-  if (newRecoveryCode) {
+  async function submitCode() {
+    setError("");
+    if (!code.trim()) { setError("Kodni kiriting"); return; }
+    if (!newPassword || newPassword.length < 6) { setError("Yangi parol kamida 6 belgidan iborat bo'lsin"); return; }
+    setBusy(true);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke("confirm-password-reset", {
+        body: { username: username.trim(), code: code.trim(), newPassword },
+      });
+      setBusy(false);
+      if (fnErr || data?.error) { setError(data?.error || String(fnErr?.message || fnErr)); return; }
+      setStep("done");
+    } catch (e) {
+      setBusy(false);
+      setError(String(e?.message || e));
+    }
+  }
+
+  if (step === "done") {
     return (
-      <RecoveryCodeModal
-        code={newRecoveryCode}
-        onClose={() => onDone()}
-      />
+      <div className="space-y-3 text-center">
+        <p className="text-sm" style={{ color: "#2f9463" }}>Parol muvaffaqiyatli yangilandi! Endi yangi parol bilan kiring.</p>
+        <button type="button" onClick={onBack} className="w-full py-2.5 rounded-lg text-xs font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
+          Kirish sahifasiga qaytish
+        </button>
+      </div>
+    );
+  }
+
+  if (step === "code") {
+    return (
+      <div className="space-y-3">
+        {info && <p className="text-xs text-center leading-snug" style={{ color: "#6a6a6a" }}>{info}</p>}
+        <IconInput icon={<KeyRound size={17} />} value={code} onChange={setCode} placeholder="Telegramdagi 6 xonali kod" />
+        <IconInput icon={<Lock size={17} />} type="password" value={newPassword} onChange={setNewPassword} placeholder="Yangi parol" />
+        {error && <p className="text-xs text-center" style={{ color: "#a10f0f" }}>{error}</p>}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={submitCode}
+          className="w-full py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest text-[#f5e9c8] disabled:opacity-60"
+          style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
+        >
+          {busy ? "Yuborilmoqda..." : "Parolni tiklash"}
+        </button>
+        <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>Ortga</button>
+      </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <IconInput icon={<UserIcon size={17} />} value={username} onChange={setUsername} placeholder="Login" />
-      <IconInput icon={<KeyRound size={17} />} value={recoveryCode} onChange={setRecoveryCode} placeholder="Tiklash kodi (XXXX-XXXX-...)" />
-      <IconInput icon={<Lock size={17} />} type="password" value={newPassword} onChange={setNewPassword} placeholder="Yangi parol" />
+      <p className="text-center text-sm mb-1 leading-snug" style={{ color: "#6a6a6a" }}>
+        Login kiriting — agar Telegram ulangan bo'lsa, tiklash kodi shu yerga yuboriladi.
+      </p>
+      <IconInput icon={<UserIcon size={17} />} value={username} onChange={setUsername} placeholder="Login" autoFocus />
+      <p className="text-center text-[11px] leading-snug" style={{ color: "#9a9a9a" }}>
+        Loginingizni ham unutgan bo'lsangiz — Telegramda botga <b>/login</b> deb yozing, u eslatib beradi.
+      </p>
       {error && <p className="text-xs text-center" style={{ color: "#a10f0f" }}>{error}</p>}
       <button
         type="button"
         disabled={busy}
-        onClick={submit}
+        onClick={submitUsername}
         className="w-full py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest text-[#f5e9c8] disabled:opacity-60"
         style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
       >
-        {busy ? "Yuborilmoqda..." : "Parolni tiklash"}
+        {busy ? "Yuborilmoqda..." : "Kodni yuborish"}
       </button>
-      <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>
-        Ortga
-      </button>
+      <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>Ortga</button>
+    </div>
+  );
+}
+
+// YANGI: ro'yxatdan o'tishda login band/bo'shligini jonli (debounce bilan) tekshiradi.
+// Band bo'lsa — input tagida qizil ogohlantirish; bo'sh bo'lsa — inputning o'ng
+// tomonida yashil tick chiqadi.
+function UsernameCheckField({ value, onChange, onStatusChange, active }) {
+  const [status, setStatus] = useState("idle"); // idle | checking | available | taken | error
+
+  useEffect(() => {
+    if (!active) return;
+    const v = value.trim();
+    if (v.length < 3) {
+      setStatus("idle");
+      onStatusChange(false);
+      return;
+    }
+    setStatus("checking");
+    const handle = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.rpc("email_for_username", { p_username: v });
+        if (error) { setStatus("idle"); onStatusChange(false); return; }
+        if (data) { setStatus("taken"); onStatusChange(false); }
+        else { setStatus("available"); onStatusChange(true); }
+      } catch (e) {
+        setStatus("idle");
+        onStatusChange(false);
+      }
+    }, 450);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, active]);
+
+  return (
+    <div>
+      <IconInput
+        icon={<UserIcon size={17} />}
+        value={value}
+        onChange={onChange}
+        placeholder="Login o'ylab toping"
+        autoFocus={active}
+        showToggle={status === "available"}
+        toggleIcon={<Check size={16} style={{ color: "#2f9463" }} />}
+        onToggle={() => {}}
+      />
+      {status === "taken" && (
+        <p className="text-[11px] mt-1.5 pl-1" style={{ color: "#a10f0f" }}>Bu login allaqachon band, boshqasini tanlang</p>
+      )}
+      {status === "checking" && (
+        <p className="text-[11px] mt-1.5 pl-1" style={{ color: "#9a9a9a" }}>Tekshirilmoqda...</p>
+      )}
     </div>
   );
 }
@@ -610,6 +763,8 @@ function AdminRecoveryForm({ onDone, onBack }) {
 function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister, loginBusy }) {
   const [showPassword, setShowPassword] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [regStep, setRegStep] = useState("username"); // "username" | "password"
+  const [usernameAvailable, setUsernameAvailable] = useState(false);
   const [regForm, setRegForm] = useState({ username: "", password: "", confirm: "" });
   const [regError, setRegError] = useState("");
   const [regBusy, setRegBusy] = useState(false);
@@ -618,7 +773,6 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const [showForgotHint, setShowForgotHint] = useState(false);
   const [forgotMode, setForgotMode] = useState(null); // null | 'choose' | 'employee' | 'admin'
   const [btnHover, setBtnHover] = useState(false);
-  const [recoveryCode, setRecoveryCode] = useState(null);
   const { t } = useApp();
 
   async function submitRegister() {
@@ -634,9 +788,9 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
       setRegError(result.error);
       return;
     }
-    if (result && result.recoveryCode) {
-      setRecoveryCode(result.recoveryCode);
-    }
+    // Muvaffaqiyat: parent (WorkforceAppInner) currentUser'ni allaqachon o'rnatgan
+    // bo'ladi va ekranni AdminApp'ga almashtiradi; tiklash kodi/Telegram taklifi
+    // endi shu yerda emas, dastur darajasida (global overlay sifatida) ko'rsatiladi.
   }
 
   const cardShadow = "-22px -22px 44px #ffffff, 22px 22px 50px #c3c3c3";
@@ -644,51 +798,103 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
   const btnShadowHover = "0 10px 22px rgba(20,60,140,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
 
-  if (recoveryCode) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
-        <RecoveryCodeModal code={recoveryCode} onClose={() => { setRecoveryCode(null); setRegistering(false); }} />
-      </div>
-    );
-  }
-
-  if (registering) {
+  if (forgotMode) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
         <div className="w-full max-w-sm">
           <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
-            <h1 className="text-center text-2xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>{t("registerTitle")}</h1>
-            <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
+            <h2 className="text-center text-lg font-bold mb-4" style={{ color: "#4a4a4a" }}>Parolni tiklash</h2>
+            <TelegramResetForm onBack={() => setForgotMode(null)} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const features = [
+    { icon: <Users size={14} />, text: "Ishchilaringizni ro'yxatga oling" },
+    { icon: <Calendar size={14} />, text: "Har kungi davomatni belgilang" },
+    { icon: <Wallet size={14} />, text: "Avans va ish haqini hisoblang" },
+  ];
+  const faceBase = { background: "#e8e8e8", boxShadow: cardShadow, gridArea: "1 / 1", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" };
+
+  function startRegister() {
+    setRegistering(true);
+    setRegStep("username");
+    setUsernameAvailable(false);
+    setRegForm({ username: "", password: "", confirm: "" });
+    setRegError("");
+  }
+  function exitRegister() {
+    setRegistering(false);
+    setRegStep("username");
+    setRegForm({ username: "", password: "", confirm: "" });
+    setRegError("");
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
+      <div className="w-full max-w-sm" style={{ perspective: "1400px" }}>
+        <div
+          style={{
+            display: "grid",
+            transformStyle: "preserve-3d",
+            transition: "transform 0.7s cubic-bezier(0.4, 0.1, 0.2, 1)",
+            transform: registering ? "rotateY(180deg)" : "rotateY(0deg)",
+          }}
+        >
+          {/* OLD TOMON — Kirish */}
+          <div className="rounded-[32px] p-8" style={faceBase}>
+            <h1 className="text-center text-3xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
+              {t("loginHeading")}
+            </h1>
+            <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>
+              {t("loginSubtitle")}
+            </p>
+
             <div className="space-y-3.5">
               <IconInput
                 icon={<UserIcon size={17} />}
-                value={regForm.username}
-                onChange={(v) => setRegForm({ ...regForm, username: v })}
-                placeholder={t("chooseLogin")}
+                value={loginForm.username}
+                onChange={(v) => setLoginForm({ ...loginForm, username: v })}
+                onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
+                placeholder={t("login")}
+                autoFocus={!registering}
               />
               <IconInput
                 icon={<Lock size={17} />}
-                type={showRegPassword ? "text" : "password"}
-                value={regForm.password}
-                onChange={(v) => setRegForm({ ...regForm, password: v })}
-                placeholder={t("choosePassword")}
+                type={showPassword ? "text" : "password"}
+                value={loginForm.password}
+                onChange={(v) => setLoginForm({ ...loginForm, password: v })}
+                onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
+                placeholder={t("password")}
                 showToggle
-                toggleIcon={showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                onToggle={() => setShowRegPassword((v) => !v)}
-              />
-              <IconInput
-                icon={<Lock size={17} />}
-                type={showRegPassword ? "text" : "password"}
-                value={regForm.confirm}
-                onChange={(v) => setRegForm({ ...regForm, confirm: v })}
-                placeholder={t("repeatNewPassword")}
+                toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                onToggle={() => setShowPassword((v) => !v)}
               />
             </div>
-            {regError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{regError}</p>}
+
+            <div className="flex items-center justify-between mt-4 mb-1">
+              <div className="flex items-center gap-2.5">
+                <ToggleSwitch checked={rememberMe} onChange={setRememberMe} />
+                <span className="text-xs" style={{ color: "#929191" }}>{t("rememberMe")}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForgotMode(true)}
+                className="text-xs font-medium transition-colors hover:opacity-80"
+                style={{ color: "#929191" }}
+              >
+                {t("forgotPassword")}
+              </button>
+            </div>
+
+            {loginError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{loginError}</p>}
+
             <button
               type="button"
-              disabled={regBusy}
-              onClick={submitRegister}
+              disabled={loginBusy}
+              onClick={() => onSubmit()}
               onMouseEnter={() => setBtnHover(true)}
               onMouseLeave={() => setBtnHover(false)}
               className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
@@ -699,134 +905,142 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
                 transform: btnHover ? "translateY(-2px)" : "translateY(0)",
               }}
             >
-              {regBusy ? t("loading") : t("createAccountBtn")}
+              {loginBusy ? t("loading") : t("loginBtn")}
             </button>
-            <button
-              type="button"
-              onClick={() => { setRegistering(false); setRegForm({ username: "", password: "", confirm: "" }); setRegError(""); }}
-              className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors"
-              style={{ color: "#9a9a9a" }}
-            >
-              {t("alreadyHaveAccount")}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  if (forgotMode) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
-        <div className="w-full max-w-sm">
-          <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
-            {forgotMode === "choose" && (
-              <div className="space-y-3">
-                <p className="text-center text-sm mb-4" style={{ color: "#6a6a6a" }}>Siz kimsiz?</p>
-                <button type="button" onClick={() => setForgotMode("employee")} className="w-full py-3 rounded-2xl text-sm font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
-                  {t("roleTabEmployee")}
+            <p className="text-center text-xs mt-5" style={{ color: "#9a9a9a" }}>
+              {t("noAccountYet")}{" "}
+              <button
+                type="button"
+                onClick={startRegister}
+                className="font-semibold transition-opacity hover:opacity-80"
+                style={{ color: "#a10f0f" }}
+              >
+                {t("signUpLink")}
+              </button>
+            </p>
+          </div>
+
+          {/* ORQA TOMON — Ro'yxatdan o'tish (bosqichma-bosqich) */}
+          <div className="rounded-[32px] p-8" style={{ ...faceBase, transform: "rotateY(180deg)" }}>
+            {regStep === "username" ? (
+              <>
+                <div className="flex justify-center mb-5">
+                  <div
+                    className="w-16 h-16 rounded-[22px] flex items-center justify-center"
+                    style={{ background: "#e8e8e8", boxShadow: "-6px -6px 12px #f8f8f8, 6px 6px 14px #c3c3c3" }}
+                  >
+                    <ShieldCheck size={28} style={{ color: "#1a56b0" }} strokeWidth={2} />
+                  </div>
+                </div>
+                <h1 className="text-center text-2xl font-bold mb-1.5 tracking-tight leading-snug" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
+                  O'z jamoangizni<br />boshqarishni boshlang
+                </h1>
+                <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
+
+                <div className="flex flex-col gap-2 mb-6">
+                  {features.map((f, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
+                      style={{ background: "#e8e8e8", boxShadow: "inset -4px -4px 8px rgba(255,255,255,0.9), inset 4px 4px 8px rgba(184,190,204,0.4)" }}
+                    >
+                      <span style={{ color: "#1a56b0" }}>{f.icon}</span>
+                      <span className="text-xs font-medium" style={{ color: "#6a6a6a" }}>{f.text}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <UsernameCheckField
+                  value={regForm.username}
+                  onChange={(v) => setRegForm({ ...regForm, username: v })}
+                  onStatusChange={setUsernameAvailable}
+                  active={registering && regStep === "username"}
+                />
+
+                <button
+                  type="button"
+                  disabled={!usernameAvailable}
+                  onClick={() => setRegStep("password")}
+                  className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-40 text-[#f5e9c8]"
+                  style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
+                >
+                  Davom etish
                 </button>
-                <button type="button" onClick={() => setForgotMode("admin")} className="w-full py-3 rounded-2xl text-sm font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
-                  {t("roleTabAdmin")}
+                <button
+                  type="button"
+                  onClick={exitRegister}
+                  className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                  style={{ color: "#9a9a9a" }}
+                >
+                  <ArrowLeft size={13} /> {t("alreadyHaveAccount")}
                 </button>
-                <button type="button" onClick={() => setForgotMode(null)} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>{t("cancel")}</button>
-              </div>
-            )}
-            {forgotMode === "employee" && (
-              <div className="space-y-3 text-center">
-                <p className="text-sm leading-snug" style={{ color: "#6a6a6a" }}>{t("forgotPasswordHint")}</p>
-                <button type="button" onClick={() => setForgotMode(null)} className="w-full py-2.5 rounded-lg text-xs font-medium mt-2" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
-                  {t("cancel")}
+              </>
+            ) : (
+              <>
+                <div className="flex justify-center mb-5">
+                  <div
+                    className="w-16 h-16 rounded-[22px] flex items-center justify-center"
+                    style={{ background: "#e8e8e8", boxShadow: "-6px -6px 12px #f8f8f8, 6px 6px 14px #c3c3c3" }}
+                  >
+                    <Lock size={26} style={{ color: "#1a56b0" }} strokeWidth={2} />
+                  </div>
+                </div>
+                <h1 className="text-center text-2xl font-bold mb-1.5 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
+                  Parol o'ylab toping
+                </h1>
+                <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>
+                  <b>{regForm.username}</b> uchun parol o'rnating
+                </p>
+
+                <div className="space-y-3.5">
+                  <IconInput
+                    icon={<Lock size={17} />}
+                    type={showRegPassword ? "text" : "password"}
+                    value={regForm.password}
+                    onChange={(v) => setRegForm({ ...regForm, password: v })}
+                    placeholder={t("choosePassword")}
+                    showToggle
+                    toggleIcon={showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    onToggle={() => setShowRegPassword((v) => !v)}
+                    autoFocus
+                  />
+                  <IconInput
+                    icon={<Lock size={17} />}
+                    type={showRegPassword ? "text" : "password"}
+                    value={regForm.confirm}
+                    onChange={(v) => setRegForm({ ...regForm, confirm: v })}
+                    placeholder={t("repeatNewPassword")}
+                  />
+                </div>
+                {regError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{regError}</p>}
+                <button
+                  type="button"
+                  disabled={regBusy}
+                  onClick={submitRegister}
+                  onMouseEnter={() => setBtnHover(true)}
+                  onMouseLeave={() => setBtnHover(false)}
+                  className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
+                  style={{
+                    background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
+                    color: btnHover ? "#f5e9c8" : "#838383",
+                    boxShadow: btnHover ? btnShadowHover : btnShadowRest,
+                    transform: btnHover ? "translateY(-2px)" : "translateY(0)",
+                  }}
+                >
+                  {regBusy ? t("loading") : t("createAccountBtn")}
                 </button>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => setRegStep("username")}
+                  className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                  style={{ color: "#9a9a9a" }}
+                >
+                  <ArrowLeft size={13} /> Ortga
+                </button>
+              </>
             )}
-            {forgotMode === "admin" && (
-              <AdminRecoveryForm onDone={() => setForgotMode(null)} onBack={() => setForgotMode(null)} />
-            )}
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
-      <div className="w-full max-w-sm">
-        <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
-          <h1 className="text-center text-3xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
-            {t("loginHeading")}
-          </h1>
-          <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>
-            {t("loginSubtitle")}
-          </p>
-
-          <div className="space-y-3.5">
-            <IconInput
-              icon={<UserIcon size={17} />}
-              value={loginForm.username}
-              onChange={(v) => setLoginForm({ ...loginForm, username: v })}
-              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
-              placeholder={t("login")}
-              autoFocus
-            />
-            <IconInput
-              icon={<Lock size={17} />}
-              type={showPassword ? "text" : "password"}
-              value={loginForm.password}
-              onChange={(v) => setLoginForm({ ...loginForm, password: v })}
-              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
-              placeholder={t("password")}
-              showToggle
-              toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              onToggle={() => setShowPassword((v) => !v)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between mt-4 mb-1">
-            <div className="flex items-center gap-2.5">
-              <ToggleSwitch checked={rememberMe} onChange={setRememberMe} />
-              <span className="text-xs" style={{ color: "#929191" }}>{t("rememberMe")}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setForgotMode("choose")}
-              className="text-xs font-medium transition-colors hover:opacity-80"
-              style={{ color: "#929191" }}
-            >
-              {t("forgotPassword")}
-            </button>
-          </div>
-
-          {loginError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{loginError}</p>}
-
-          <button
-            type="button"
-            disabled={loginBusy}
-            onClick={() => onSubmit()}
-            onMouseEnter={() => setBtnHover(true)}
-            onMouseLeave={() => setBtnHover(false)}
-            className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
-            style={{
-              background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
-              color: btnHover ? "#f5e9c8" : "#838383",
-              boxShadow: btnHover ? btnShadowHover : btnShadowRest,
-              transform: btnHover ? "translateY(-2px)" : "translateY(0)",
-            }}
-          >
-            {loginBusy ? t("loading") : t("loginBtn")}
-          </button>
-
-          <p className="text-center text-xs mt-5" style={{ color: "#9a9a9a" }}>
-            {t("noAccountYet")}{" "}
-            <button
-              type="button"
-              onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
-              className="font-semibold transition-opacity hover:opacity-80"
-              style={{ color: "#a10f0f" }}
-            >
-              {t("signUpLink")}
-            </button>
-          </p>
         </div>
       </div>
     </div>
@@ -1137,9 +1351,19 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
 
 function ProfileDrawer({
   open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
-  changeOwnCredentials, updateAvatar, enableNotifications,
+  changeOwnCredentials, updateAvatar, enableNotifications, linkTelegram,
   accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
+  const [tgBusy, setTgBusy] = useState(false);
+  const [tgMsg, setTgMsg] = useState("");
+  async function handleLinkTelegram() {
+    setTgBusy(true);
+    setTgMsg("");
+    const result = await linkTelegram();
+    setTgBusy(false);
+    if (result && result.error) setTgMsg(result.error);
+    else setTgMsg("Telegram ochildi — u yerda \"Start\" tugmasini bosing.");
+  }
   const { t } = useApp();
   const fileRef = useRef(null);
   const [page, setPage] = useState(null);
@@ -1355,6 +1579,8 @@ function ProfileDrawer({
         {page === "privacy" && (
           <div className="px-5">
             <MenuRow icon={<KeyRound size={18} className="text-[var(--accent)]" />} label={t("updateCredentials")} onClick={() => setPage("credentials")} />
+            <MenuRow icon={<Send size={18} className="text-[#2aa9de]" />} label={tgBusy ? t("loading") : "Telegramga ulash (parolni tiklash uchun)"} onClick={handleLinkTelegram} />
+            {tgMsg && <p className="text-[var(--text-secondary)] text-xs pb-3 -mt-1">{tgMsg}</p>}
             {isAdmin && (
               <MenuRow icon={<Send size={18} className="text-[var(--good)]" />} label={t("enableNotifications")} onClick={enableNotifications} />
             )}
@@ -1466,7 +1692,7 @@ function AdminApp({
   attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
-  notifications, markAllNotificationsRead,
+  notifications, markAllNotificationsRead, linkTelegram,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1578,6 +1804,7 @@ function AdminApp({
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
         enableNotifications={enableNotifications}
+        linkTelegram={linkTelegram}
       />
       <NotificationPanel
         open={notifOpen}
@@ -2043,7 +2270,7 @@ function AdminApp({
 
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, linkTelegram,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [empTab, setEmpTab] = useState("umumiy");
@@ -2145,6 +2372,7 @@ function EmployeeApp({
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        linkTelegram={linkTelegram}
       />
       <Shell
         title={t("employeePanel")}
@@ -2348,6 +2576,10 @@ function WorkforceAppInner() {
   const [session, setSession] = useState(null);
   const [currentUser, setCurrentUserState] = useState(null);
   const [recoveryCodeToShow, setRecoveryCodeToShow] = useState(null);
+  const [telegramPromptOpen, setTelegramPromptOpen] = useState(false);
+  const [telegramPromptPhase, setTelegramPromptPhase] = useState("prompt"); // prompt | waiting | success
+  const [telegramLinkBusy, setTelegramLinkBusy] = useState(false);
+  const telegramPollRef = useRef(null);
 
   function setCurrentUser(user) {
     setCurrentUserState(user);
@@ -2573,7 +2805,12 @@ function WorkforceAppInner() {
       }
       setSession(signInData.session);
       await loadAllData(signInData.session.user);
-      return { recoveryCode: data.recoveryCode || null };
+      if (data.recoveryCode) {
+        setRecoveryCodeToShow(data.recoveryCode);
+      } else {
+        setTelegramPromptOpen(true);
+      }
+      return {};
     } catch (err) {
       return { error: String(err && err.message ? err.message : err) };
     }
@@ -2757,6 +2994,54 @@ function WorkforceAppInner() {
   // BILDIRISHNOMALAR (push)
   // ============================================================================
 
+  async function linkTelegram() {
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-link-start");
+      if (error || data?.error) {
+        return { error: data?.error || String(error?.message || error) };
+      }
+      window.open(data.linkUrl, "_blank");
+      startTelegramLinkPolling();
+      return {};
+    } catch (e) {
+      return { error: String(e?.message || e) };
+    }
+  }
+
+  // "Start" tugmasi Telegram tomonda bosilishini kuzatib boradi (har 2 soniyada
+  // profilni tekshiradi). Bosilgach — tick + "Xush kelibsiz" ko'rsatiladi.
+  function startTelegramLinkPolling() {
+    setTelegramPromptPhase("waiting");
+    let attempts = 0;
+    if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+    telegramPollRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes?.user?.id;
+        if (uid) {
+          const { data: prof } = await supabase.from("profiles").select("telegram_chat_id").eq("id", uid).maybeSingle();
+          if (prof?.telegram_chat_id) {
+            clearInterval(telegramPollRef.current);
+            telegramPollRef.current = null;
+            setTelegramPromptPhase("success");
+            setTimeout(() => { setTelegramPromptOpen(false); setTelegramPromptPhase("prompt"); }, 1800);
+            return;
+          }
+        }
+      } catch (e) {}
+      if (attempts >= 60) { // ~2 daqiqa
+        clearInterval(telegramPollRef.current);
+        telegramPollRef.current = null;
+        setTelegramPromptPhase("prompt");
+      }
+    }, 2000);
+  }
+
+  useEffect(() => {
+    return () => { if (telegramPollRef.current) clearInterval(telegramPollRef.current); };
+  }, []);
+
   async function enableNotifications() {
     if (!currentUser || currentUser.role !== "admin") return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -2845,6 +3130,7 @@ function WorkforceAppInner() {
         enableNotifications={enableNotifications}
         notifications={notifications}
         markAllNotificationsRead={markAllNotificationsRead}
+        linkTelegram={linkTelegram}
       />
     );
   } else {
@@ -2861,6 +3147,7 @@ function WorkforceAppInner() {
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
+        linkTelegram={linkTelegram}
       />
     );
   }
@@ -2900,6 +3187,28 @@ function WorkforceAppInner() {
           }
         `}</style>
         {screen}
+        {recoveryCodeToShow && (
+          <RecoveryCodeModal
+            code={recoveryCodeToShow}
+            onClose={() => { setRecoveryCodeToShow(null); setTelegramPromptOpen(true); }}
+          />
+        )}
+        {telegramPromptOpen && (
+          <TelegramPromptModal
+            phase={telegramPromptPhase}
+            busy={telegramLinkBusy}
+            onLink={async () => {
+              setTelegramLinkBusy(true);
+              await linkTelegram();
+              setTelegramLinkBusy(false);
+            }}
+            onSkip={() => {
+              if (telegramPollRef.current) { clearInterval(telegramPollRef.current); telegramPollRef.current = null; }
+              setTelegramPromptOpen(false);
+              setTelegramPromptPhase("prompt");
+            }}
+          />
+        )}
       </div>
     </AppContext.Provider>
   );
