@@ -502,30 +502,61 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, 
   );
 }
 
-function TelegramPromptModal({ onLink, onSkip, busy }) {
+function TelegramPromptModal({ phase, onLink, onSkip, busy }) {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
       <div className="w-full max-w-sm bg-[var(--bg-panel)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl text-center">
-        <div className="flex items-center justify-center gap-2 text-[var(--text-primary)] font-semibold text-base mb-1.5">
-          <Send size={18} className="text-[#2aa9de]" /> Xush kelibsiz!
-        </div>
-        <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
-          Parolni (yoki loginni) unutib qolsangiz tiklay olishingiz uchun, hisobingizni Telegram botga ulab qo'ying — bir necha soniya vaqt oladi.
-        </p>
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onLink}
-            className="w-full py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
-            style={{ backgroundColor: "#2aa9de" }}
-          >
-            {busy ? "..." : "Telegramga ulash"}
-          </button>
-          <button type="button" onClick={onSkip} className="w-full py-2 text-xs font-medium text-[var(--text-muted)]">
-            Keyinroq
-          </button>
-        </div>
+        {phase === "success" ? (
+          <>
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
+              style={{ backgroundColor: "var(--good-soft)" }}
+            >
+              <Check size={28} style={{ color: "var(--good)" }} />
+            </div>
+            <div className="text-[var(--text-primary)] font-semibold text-base mb-1">Xush kelibsiz!</div>
+            <p className="text-[var(--text-secondary)] text-xs">Telegram muvaffaqiyatli ulandi.</p>
+          </>
+        ) : phase === "waiting" ? (
+          <>
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse"
+              style={{ backgroundColor: "rgba(42,169,222,0.15)" }}
+            >
+              <Send size={24} style={{ color: "#2aa9de" }} />
+            </div>
+            <div className="text-[var(--text-primary)] font-semibold text-base mb-1.5">Telegramda kuting...</div>
+            <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
+              Ochilgan botga o'ting va "Start" tugmasini bosing — bosishingiz bilan bu oyna avtomatik davom etadi.
+            </p>
+            <button type="button" onClick={onSkip} className="w-full py-2 text-xs font-medium text-[var(--text-muted)]">
+              Keyinroq
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-center gap-2 text-[var(--text-primary)] font-semibold text-base mb-1.5">
+              <Send size={18} className="text-[#2aa9de]" /> Xush kelibsiz!
+            </div>
+            <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
+              Parolni (yoki loginni) unutib qolsangiz tiklay olishingiz uchun, hisobingizni Telegram botga ulab qo'ying — bir necha soniya vaqt oladi.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onLink}
+                className="w-full py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+                style={{ backgroundColor: "#2aa9de" }}
+              >
+                {busy ? "..." : "Telegramga ulash"}
+              </button>
+              <button type="button" onClick={onSkip} className="w-full py-2 text-xs font-medium text-[var(--text-muted)]">
+                Keyinroq
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -677,9 +708,63 @@ function TelegramResetForm({ onBack }) {
   );
 }
 
+// YANGI: ro'yxatdan o'tishda login band/bo'shligini jonli (debounce bilan) tekshiradi.
+// Band bo'lsa — input tagida qizil ogohlantirish; bo'sh bo'lsa — inputning o'ng
+// tomonida yashil tick chiqadi.
+function UsernameCheckField({ value, onChange, onStatusChange, active }) {
+  const [status, setStatus] = useState("idle"); // idle | checking | available | taken | error
+
+  useEffect(() => {
+    if (!active) return;
+    const v = value.trim();
+    if (v.length < 3) {
+      setStatus("idle");
+      onStatusChange(false);
+      return;
+    }
+    setStatus("checking");
+    const handle = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.rpc("email_for_username", { p_username: v });
+        if (error) { setStatus("idle"); onStatusChange(false); return; }
+        if (data) { setStatus("taken"); onStatusChange(false); }
+        else { setStatus("available"); onStatusChange(true); }
+      } catch (e) {
+        setStatus("idle");
+        onStatusChange(false);
+      }
+    }, 450);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, active]);
+
+  return (
+    <div>
+      <IconInput
+        icon={<UserIcon size={17} />}
+        value={value}
+        onChange={onChange}
+        placeholder="Login o'ylab toping"
+        autoFocus={active}
+        showToggle={status === "available"}
+        toggleIcon={<Check size={16} style={{ color: "#2f9463" }} />}
+        onToggle={() => {}}
+      />
+      {status === "taken" && (
+        <p className="text-[11px] mt-1.5 pl-1" style={{ color: "#a10f0f" }}>Bu login allaqachon band, boshqasini tanlang</p>
+      )}
+      {status === "checking" && (
+        <p className="text-[11px] mt-1.5 pl-1" style={{ color: "#9a9a9a" }}>Tekshirilmoqda...</p>
+      )}
+    </div>
+  );
+}
+
 function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister, loginBusy }) {
   const [showPassword, setShowPassword] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [regStep, setRegStep] = useState("username"); // "username" | "password"
+  const [usernameAvailable, setUsernameAvailable] = useState(false);
   const [regForm, setRegForm] = useState({ username: "", password: "", confirm: "" });
   const [regError, setRegError] = useState("");
   const [regBusy, setRegBusy] = useState(false);
@@ -713,99 +798,6 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
   const btnShadowHover = "0 10px 22px rgba(20,60,140,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
 
-  if (registering) {
-    const regBtnShadowRest = "-6px -6px 12px #f8f8f8, 6px 6px 14px #c3c3c3";
-    const features = [
-      { icon: <Users size={14} />, text: "Ishchilaringizni ro'yxatga oling" },
-      { icon: <Calendar size={14} />, text: "Har kungi davomatni belgilang" },
-      { icon: <Wallet size={14} />, text: "Avans va ish haqini hisoblang" },
-    ];
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
-        <div className="w-full max-w-sm">
-          <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
-            <div className="flex justify-center mb-5">
-              <div
-                className="w-16 h-16 rounded-[22px] flex items-center justify-center"
-                style={{ background: "#e8e8e8", boxShadow: regBtnShadowRest }}
-              >
-                <ShieldCheck size={28} style={{ color: "#1a56b0" }} strokeWidth={2} />
-              </div>
-            </div>
-            <h1 className="text-center text-2xl font-bold mb-1.5 tracking-tight leading-snug" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
-              O'z jamoangizni<br />boshqarishni boshlang
-            </h1>
-            <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
-
-            <div className="flex flex-col gap-2 mb-6">
-              {features.map((f, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
-                  style={{ background: "#e8e8e8", boxShadow: "inset -4px -4px 8px rgba(255,255,255,0.9), inset 4px 4px 8px rgba(184,190,204,0.4)" }}
-                >
-                  <span style={{ color: "#1a56b0" }}>{f.icon}</span>
-                  <span className="text-xs font-medium" style={{ color: "#6a6a6a" }}>{f.text}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-3.5">
-              <IconInput
-                icon={<UserIcon size={17} />}
-                value={regForm.username}
-                onChange={(v) => setRegForm({ ...regForm, username: v })}
-                placeholder={t("chooseLogin")}
-              />
-              <IconInput
-                icon={<Lock size={17} />}
-                type={showRegPassword ? "text" : "password"}
-                value={regForm.password}
-                onChange={(v) => setRegForm({ ...regForm, password: v })}
-                placeholder={t("choosePassword")}
-                showToggle
-                toggleIcon={showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                onToggle={() => setShowRegPassword((v) => !v)}
-              />
-              <IconInput
-                icon={<Lock size={17} />}
-                type={showRegPassword ? "text" : "password"}
-                value={regForm.confirm}
-                onChange={(v) => setRegForm({ ...regForm, confirm: v })}
-                placeholder={t("repeatNewPassword")}
-              />
-            </div>
-            {regError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{regError}</p>}
-            <button
-              type="button"
-              disabled={regBusy}
-              onClick={submitRegister}
-              onMouseEnter={() => setBtnHover(true)}
-              onMouseLeave={() => setBtnHover(false)}
-              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
-              style={{
-                background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
-                color: btnHover ? "#f5e9c8" : "#838383",
-                boxShadow: btnHover ? btnShadowHover : btnShadowRest,
-                transform: btnHover ? "translateY(-2px)" : "translateY(0)",
-              }}
-            >
-              {regBusy ? t("loading") : t("createAccountBtn")}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setRegistering(false); setRegForm({ username: "", password: "", confirm: "" }); setRegError(""); }}
-              className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
-              style={{ color: "#9a9a9a" }}
-            >
-              <ArrowLeft size={13} /> {t("alreadyHaveAccount")}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (forgotMode) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
@@ -819,84 +811,236 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     );
   }
 
+  const features = [
+    { icon: <Users size={14} />, text: "Ishchilaringizni ro'yxatga oling" },
+    { icon: <Calendar size={14} />, text: "Har kungi davomatni belgilang" },
+    { icon: <Wallet size={14} />, text: "Avans va ish haqini hisoblang" },
+  ];
+  const faceBase = { background: "#e8e8e8", boxShadow: cardShadow, gridArea: "1 / 1", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" };
+
+  function startRegister() {
+    setRegistering(true);
+    setRegStep("username");
+    setUsernameAvailable(false);
+    setRegForm({ username: "", password: "", confirm: "" });
+    setRegError("");
+  }
+  function exitRegister() {
+    setRegistering(false);
+    setRegStep("username");
+    setRegForm({ username: "", password: "", confirm: "" });
+    setRegError("");
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
-      <div className="w-full max-w-sm">
-        <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
-          <h1 className="text-center text-3xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
-            {t("loginHeading")}
-          </h1>
-          <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>
-            {t("loginSubtitle")}
-          </p>
+      <div className="w-full max-w-sm" style={{ perspective: "1400px" }}>
+        <div
+          style={{
+            display: "grid",
+            transformStyle: "preserve-3d",
+            transition: "transform 0.7s cubic-bezier(0.4, 0.1, 0.2, 1)",
+            transform: registering ? "rotateY(180deg)" : "rotateY(0deg)",
+          }}
+        >
+          {/* OLD TOMON — Kirish */}
+          <div className="rounded-[32px] p-8" style={faceBase}>
+            <h1 className="text-center text-3xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
+              {t("loginHeading")}
+            </h1>
+            <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>
+              {t("loginSubtitle")}
+            </p>
 
-          <div className="space-y-3.5">
-            <IconInput
-              icon={<UserIcon size={17} />}
-              value={loginForm.username}
-              onChange={(v) => setLoginForm({ ...loginForm, username: v })}
-              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
-              placeholder={t("login")}
-              autoFocus
-            />
-            <IconInput
-              icon={<Lock size={17} />}
-              type={showPassword ? "text" : "password"}
-              value={loginForm.password}
-              onChange={(v) => setLoginForm({ ...loginForm, password: v })}
-              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
-              placeholder={t("password")}
-              showToggle
-              toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              onToggle={() => setShowPassword((v) => !v)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between mt-4 mb-1">
-            <div className="flex items-center gap-2.5">
-              <ToggleSwitch checked={rememberMe} onChange={setRememberMe} />
-              <span className="text-xs" style={{ color: "#929191" }}>{t("rememberMe")}</span>
+            <div className="space-y-3.5">
+              <IconInput
+                icon={<UserIcon size={17} />}
+                value={loginForm.username}
+                onChange={(v) => setLoginForm({ ...loginForm, username: v })}
+                onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
+                placeholder={t("login")}
+                autoFocus={!registering}
+              />
+              <IconInput
+                icon={<Lock size={17} />}
+                type={showPassword ? "text" : "password"}
+                value={loginForm.password}
+                onChange={(v) => setLoginForm({ ...loginForm, password: v })}
+                onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
+                placeholder={t("password")}
+                showToggle
+                toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                onToggle={() => setShowPassword((v) => !v)}
+              />
             </div>
+
+            <div className="flex items-center justify-between mt-4 mb-1">
+              <div className="flex items-center gap-2.5">
+                <ToggleSwitch checked={rememberMe} onChange={setRememberMe} />
+                <span className="text-xs" style={{ color: "#929191" }}>{t("rememberMe")}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForgotMode(true)}
+                className="text-xs font-medium transition-colors hover:opacity-80"
+                style={{ color: "#929191" }}
+              >
+                {t("forgotPassword")}
+              </button>
+            </div>
+
+            {loginError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{loginError}</p>}
+
             <button
               type="button"
-              onClick={() => setForgotMode(true)}
-              className="text-xs font-medium transition-colors hover:opacity-80"
-              style={{ color: "#929191" }}
+              disabled={loginBusy}
+              onClick={() => onSubmit()}
+              onMouseEnter={() => setBtnHover(true)}
+              onMouseLeave={() => setBtnHover(false)}
+              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
+              style={{
+                background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
+                color: btnHover ? "#f5e9c8" : "#838383",
+                boxShadow: btnHover ? btnShadowHover : btnShadowRest,
+                transform: btnHover ? "translateY(-2px)" : "translateY(0)",
+              }}
             >
-              {t("forgotPassword")}
+              {loginBusy ? t("loading") : t("loginBtn")}
             </button>
+
+            <p className="text-center text-xs mt-5" style={{ color: "#9a9a9a" }}>
+              {t("noAccountYet")}{" "}
+              <button
+                type="button"
+                onClick={startRegister}
+                className="font-semibold transition-opacity hover:opacity-80"
+                style={{ color: "#a10f0f" }}
+              >
+                {t("signUpLink")}
+              </button>
+            </p>
           </div>
 
-          {loginError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{loginError}</p>}
+          {/* ORQA TOMON — Ro'yxatdan o'tish (bosqichma-bosqich) */}
+          <div className="rounded-[32px] p-8" style={{ ...faceBase, transform: "rotateY(180deg)" }}>
+            {regStep === "username" ? (
+              <>
+                <div className="flex justify-center mb-5">
+                  <div
+                    className="w-16 h-16 rounded-[22px] flex items-center justify-center"
+                    style={{ background: "#e8e8e8", boxShadow: "-6px -6px 12px #f8f8f8, 6px 6px 14px #c3c3c3" }}
+                  >
+                    <ShieldCheck size={28} style={{ color: "#1a56b0" }} strokeWidth={2} />
+                  </div>
+                </div>
+                <h1 className="text-center text-2xl font-bold mb-1.5 tracking-tight leading-snug" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
+                  O'z jamoangizni<br />boshqarishni boshlang
+                </h1>
+                <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
 
-          <button
-            type="button"
-            disabled={loginBusy}
-            onClick={() => onSubmit()}
-            onMouseEnter={() => setBtnHover(true)}
-            onMouseLeave={() => setBtnHover(false)}
-            className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
-            style={{
-              background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
-              color: btnHover ? "#f5e9c8" : "#838383",
-              boxShadow: btnHover ? btnShadowHover : btnShadowRest,
-              transform: btnHover ? "translateY(-2px)" : "translateY(0)",
-            }}
-          >
-            {loginBusy ? t("loading") : t("loginBtn")}
-          </button>
+                <div className="flex flex-col gap-2 mb-6">
+                  {features.map((f, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
+                      style={{ background: "#e8e8e8", boxShadow: "inset -4px -4px 8px rgba(255,255,255,0.9), inset 4px 4px 8px rgba(184,190,204,0.4)" }}
+                    >
+                      <span style={{ color: "#1a56b0" }}>{f.icon}</span>
+                      <span className="text-xs font-medium" style={{ color: "#6a6a6a" }}>{f.text}</span>
+                    </div>
+                  ))}
+                </div>
 
-          <p className="text-center text-xs mt-5" style={{ color: "#9a9a9a" }}>
-            {t("noAccountYet")}{" "}
-            <button
-              type="button"
-              onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
-              className="font-semibold transition-opacity hover:opacity-80"
-              style={{ color: "#a10f0f" }}
-            >
-              {t("signUpLink")}
-            </button>
-          </p>
+                <UsernameCheckField
+                  value={regForm.username}
+                  onChange={(v) => setRegForm({ ...regForm, username: v })}
+                  onStatusChange={setUsernameAvailable}
+                  active={registering && regStep === "username"}
+                />
+
+                <button
+                  type="button"
+                  disabled={!usernameAvailable}
+                  onClick={() => setRegStep("password")}
+                  className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-40 text-[#f5e9c8]"
+                  style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
+                >
+                  Davom etish
+                </button>
+                <button
+                  type="button"
+                  onClick={exitRegister}
+                  className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                  style={{ color: "#9a9a9a" }}
+                >
+                  <ArrowLeft size={13} /> {t("alreadyHaveAccount")}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-center mb-5">
+                  <div
+                    className="w-16 h-16 rounded-[22px] flex items-center justify-center"
+                    style={{ background: "#e8e8e8", boxShadow: "-6px -6px 12px #f8f8f8, 6px 6px 14px #c3c3c3" }}
+                  >
+                    <Lock size={26} style={{ color: "#1a56b0" }} strokeWidth={2} />
+                  </div>
+                </div>
+                <h1 className="text-center text-2xl font-bold mb-1.5 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
+                  Parol o'ylab toping
+                </h1>
+                <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>
+                  <b>{regForm.username}</b> uchun parol o'rnating
+                </p>
+
+                <div className="space-y-3.5">
+                  <IconInput
+                    icon={<Lock size={17} />}
+                    type={showRegPassword ? "text" : "password"}
+                    value={regForm.password}
+                    onChange={(v) => setRegForm({ ...regForm, password: v })}
+                    placeholder={t("choosePassword")}
+                    showToggle
+                    toggleIcon={showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    onToggle={() => setShowRegPassword((v) => !v)}
+                    autoFocus
+                  />
+                  <IconInput
+                    icon={<Lock size={17} />}
+                    type={showRegPassword ? "text" : "password"}
+                    value={regForm.confirm}
+                    onChange={(v) => setRegForm({ ...regForm, confirm: v })}
+                    placeholder={t("repeatNewPassword")}
+                  />
+                </div>
+                {regError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{regError}</p>}
+                <button
+                  type="button"
+                  disabled={regBusy}
+                  onClick={submitRegister}
+                  onMouseEnter={() => setBtnHover(true)}
+                  onMouseLeave={() => setBtnHover(false)}
+                  className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
+                  style={{
+                    background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
+                    color: btnHover ? "#f5e9c8" : "#838383",
+                    boxShadow: btnHover ? btnShadowHover : btnShadowRest,
+                    transform: btnHover ? "translateY(-2px)" : "translateY(0)",
+                  }}
+                >
+                  {regBusy ? t("loading") : t("createAccountBtn")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegStep("username")}
+                  className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                  style={{ color: "#9a9a9a" }}
+                >
+                  <ArrowLeft size={13} /> Ortga
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -2433,7 +2577,9 @@ function WorkforceAppInner() {
   const [currentUser, setCurrentUserState] = useState(null);
   const [recoveryCodeToShow, setRecoveryCodeToShow] = useState(null);
   const [telegramPromptOpen, setTelegramPromptOpen] = useState(false);
+  const [telegramPromptPhase, setTelegramPromptPhase] = useState("prompt"); // prompt | waiting | success
   const [telegramLinkBusy, setTelegramLinkBusy] = useState(false);
+  const telegramPollRef = useRef(null);
 
   function setCurrentUser(user) {
     setCurrentUserState(user);
@@ -2855,11 +3001,46 @@ function WorkforceAppInner() {
         return { error: data?.error || String(error?.message || error) };
       }
       window.open(data.linkUrl, "_blank");
+      startTelegramLinkPolling();
       return {};
     } catch (e) {
       return { error: String(e?.message || e) };
     }
   }
+
+  // "Start" tugmasi Telegram tomonda bosilishini kuzatib boradi (har 2 soniyada
+  // profilni tekshiradi). Bosilgach — tick + "Xush kelibsiz" ko'rsatiladi.
+  function startTelegramLinkPolling() {
+    setTelegramPromptPhase("waiting");
+    let attempts = 0;
+    if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+    telegramPollRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes?.user?.id;
+        if (uid) {
+          const { data: prof } = await supabase.from("profiles").select("telegram_chat_id").eq("id", uid).maybeSingle();
+          if (prof?.telegram_chat_id) {
+            clearInterval(telegramPollRef.current);
+            telegramPollRef.current = null;
+            setTelegramPromptPhase("success");
+            setTimeout(() => { setTelegramPromptOpen(false); setTelegramPromptPhase("prompt"); }, 1800);
+            return;
+          }
+        }
+      } catch (e) {}
+      if (attempts >= 60) { // ~2 daqiqa
+        clearInterval(telegramPollRef.current);
+        telegramPollRef.current = null;
+        setTelegramPromptPhase("prompt");
+      }
+    }, 2000);
+  }
+
+  useEffect(() => {
+    return () => { if (telegramPollRef.current) clearInterval(telegramPollRef.current); };
+  }, []);
 
   async function enableNotifications() {
     if (!currentUser || currentUser.role !== "admin") return;
@@ -3014,14 +3195,18 @@ function WorkforceAppInner() {
         )}
         {telegramPromptOpen && (
           <TelegramPromptModal
+            phase={telegramPromptPhase}
             busy={telegramLinkBusy}
             onLink={async () => {
               setTelegramLinkBusy(true);
               await linkTelegram();
               setTelegramLinkBusy(false);
-              setTelegramPromptOpen(false);
             }}
-            onSkip={() => setTelegramPromptOpen(false)}
+            onSkip={() => {
+              if (telegramPollRef.current) { clearInterval(telegramPollRef.current); telegramPollRef.current = null; }
+              setTelegramPromptOpen(false);
+              setTelegramPromptPhase("prompt");
+            }}
           />
         )}
       </div>
