@@ -304,6 +304,27 @@ class AppErrorBoundary extends Component {
   }
 }
 
+// YANGI: supabase.functions.invoke() xato qaytarganda, Supabase JS kutubxonasi
+// odatda umumiy "Edge Function returned a non-2xx status code" kabi tushunarsiz
+// xabar beradi va funksiyaning o'zi yozgan aniq xabarni (masalan "Bu login
+// band") yashirib qo'yadi. Bu yordamchi funksiya asl JSON javobni o'qib,
+// foydalanuvchiga tushunarli xabarni chiqarib beradi.
+async function invokeFn(name, body) {
+  const { data, error } = await supabase.functions.invoke(name, body !== undefined ? { body } : undefined);
+  if (error) {
+    let message = error.message || String(error);
+    try {
+      if (error.context && typeof error.context.json === "function") {
+        const body2 = await error.context.json();
+        if (body2 && body2.error) message = body2.error;
+      }
+    } catch (e) {}
+    return { data: null, error: message };
+  }
+  if (data && data.error) return { data: null, error: data.error };
+  return { data, error: null };
+}
+
 function fileToAvatarDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -623,9 +644,9 @@ function TelegramResetForm({ onBack }) {
     if (!username.trim()) { setError("Login kiritilmagan"); return; }
     setBusy(true);
     try {
-      const { error: fnErr } = await supabase.functions.invoke("request-password-reset", { body: { username: username.trim() } });
+      const { error: fnErr } = await invokeFn("request-password-reset", { username: username.trim() });
       setBusy(false);
-      if (fnErr) { setError(String(fnErr.message || fnErr)); return; }
+      if (fnErr) { setError(fnErr); return; }
       setInfo("Agar Telegram ulangan bo'lsa, kod shu botga yuborildi. Telegramni tekshiring va kodni kiriting.");
       setStep("code");
     } catch (e) {
@@ -640,11 +661,9 @@ function TelegramResetForm({ onBack }) {
     if (!newPassword || newPassword.length < 6) { setError("Yangi parol kamida 6 belgidan iborat bo'lsin"); return; }
     setBusy(true);
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke("confirm-password-reset", {
-        body: { username: username.trim(), code: code.trim(), newPassword },
-      });
+      const { error: fnErr } = await invokeFn("confirm-password-reset", { username: username.trim(), code: code.trim(), newPassword });
       setBusy(false);
-      if (fnErr || data?.error) { setError(data?.error || String(fnErr?.message || fnErr)); return; }
+      if (fnErr) { setError(fnErr); return; }
       setStep("done");
     } catch (e) {
       setBusy(false);
@@ -2790,11 +2809,9 @@ function WorkforceAppInner() {
 
   async function registerAdmin(newUsername, newPassword) {
     try {
-      const { data, error } = await supabase.functions.invoke("register-admin", {
-        body: { username: newUsername, password: newPassword },
-      });
-      if (error || data?.error) {
-        return { error: data?.error || String(error?.message || error) };
+      const { error } = await invokeFn("register-admin", { username: newUsername, password: newPassword });
+      if (error) {
+        return { error };
       }
       const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
         email: `${newUsername.toLowerCase()}@nazoratplus.internal`,
@@ -2805,11 +2822,7 @@ function WorkforceAppInner() {
       }
       setSession(signInData.session);
       await loadAllData(signInData.session.user);
-      if (data.recoveryCode) {
-        setRecoveryCodeToShow(data.recoveryCode);
-      } else {
-        setTelegramPromptOpen(true);
-      }
+      setTelegramPromptOpen(true);
       return {};
     } catch (err) {
       return { error: String(err && err.message ? err.message : err) };
