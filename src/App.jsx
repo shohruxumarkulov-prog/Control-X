@@ -502,6 +502,35 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, 
   );
 }
 
+function TelegramPromptModal({ onLink, onSkip, busy }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
+      <div className="w-full max-w-sm bg-[var(--bg-panel)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl text-center">
+        <div className="flex items-center justify-center gap-2 text-[var(--text-primary)] font-semibold text-base mb-1.5">
+          <Send size={18} className="text-[#2aa9de]" /> Xush kelibsiz!
+        </div>
+        <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
+          Parolni (yoki loginni) unutib qolsangiz tiklay olishingiz uchun, hisobingizni Telegram botga ulab qo'ying — bir necha soniya vaqt oladi.
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onLink}
+            className="w-full py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+            style={{ backgroundColor: "#2aa9de" }}
+          >
+            {busy ? "..." : "Telegramga ulash"}
+          </button>
+          <button type="button" onClick={onSkip} className="w-full py-2 text-xs font-medium text-[var(--text-muted)]">
+            Keyinroq
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RecoveryCodeModal({ code, onClose }) {
   const [copied, setCopied] = useState(false);
   async function doCopy() {
@@ -630,6 +659,9 @@ function TelegramResetForm({ onBack }) {
         Login kiriting — agar Telegram ulangan bo'lsa, tiklash kodi shu yerga yuboriladi.
       </p>
       <IconInput icon={<UserIcon size={17} />} value={username} onChange={setUsername} placeholder="Login" autoFocus />
+      <p className="text-center text-[11px] leading-snug" style={{ color: "#9a9a9a" }}>
+        Loginingizni ham unutgan bo'lsangiz — Telegramda botga <b>/login</b> deb yozing, u eslatib beradi.
+      </p>
       {error && <p className="text-xs text-center" style={{ color: "#a10f0f" }}>{error}</p>}
       <button
         type="button"
@@ -2370,6 +2402,8 @@ function WorkforceAppInner() {
   const [session, setSession] = useState(null);
   const [currentUser, setCurrentUserState] = useState(null);
   const [recoveryCodeToShow, setRecoveryCodeToShow] = useState(null);
+  const [telegramPromptOpen, setTelegramPromptOpen] = useState(false);
+  const [telegramLinkBusy, setTelegramLinkBusy] = useState(false);
 
   function setCurrentUser(user) {
     setCurrentUserState(user);
@@ -2595,7 +2629,12 @@ function WorkforceAppInner() {
       }
       setSession(signInData.session);
       await loadAllData(signInData.session.user);
-      return { recoveryCode: data.recoveryCode || null };
+      if (data.recoveryCode) {
+        setRecoveryCodeToShow(data.recoveryCode);
+      } else {
+        setTelegramPromptOpen(true);
+      }
+      return {};
     } catch (err) {
       return { error: String(err && err.message ? err.message : err) };
     }
@@ -2937,6 +2976,24 @@ function WorkforceAppInner() {
           }
         `}</style>
         {screen}
+        {recoveryCodeToShow && (
+          <RecoveryCodeModal
+            code={recoveryCodeToShow}
+            onClose={() => { setRecoveryCodeToShow(null); setTelegramPromptOpen(true); }}
+          />
+        )}
+        {telegramPromptOpen && (
+          <TelegramPromptModal
+            busy={telegramLinkBusy}
+            onLink={async () => {
+              setTelegramLinkBusy(true);
+              await linkTelegram();
+              setTelegramLinkBusy(false);
+              setTelegramPromptOpen(false);
+            }}
+            onSkip={() => setTelegramPromptOpen(false)}
+          />
+        )}
       </div>
     </AppContext.Provider>
   );
