@@ -714,12 +714,42 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const btnShadowHover = "0 10px 22px rgba(20,60,140,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
 
   if (registering) {
+    const regBtnShadowRest = "-6px -6px 12px #f8f8f8, 6px 6px 14px #c3c3c3";
+    const features = [
+      { icon: <Users size={14} />, text: "Ishchilaringizni ro'yxatga oling" },
+      { icon: <Calendar size={14} />, text: "Har kungi davomatni belgilang" },
+      { icon: <Wallet size={14} />, text: "Avans va ish haqini hisoblang" },
+    ];
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
         <div className="w-full max-w-sm">
           <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
-            <h1 className="text-center text-2xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>{t("registerTitle")}</h1>
-            <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
+            <div className="flex justify-center mb-5">
+              <div
+                className="w-16 h-16 rounded-[22px] flex items-center justify-center"
+                style={{ background: "#e8e8e8", boxShadow: regBtnShadowRest }}
+              >
+                <ShieldCheck size={28} style={{ color: "#1a56b0" }} strokeWidth={2} />
+              </div>
+            </div>
+            <h1 className="text-center text-2xl font-bold mb-1.5 tracking-tight leading-snug" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
+              O'z jamoangizni<br />boshqarishni boshlang
+            </h1>
+            <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
+
+            <div className="flex flex-col gap-2 mb-6">
+              {features.map((f, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
+                  style={{ background: "#e8e8e8", boxShadow: "inset -4px -4px 8px rgba(255,255,255,0.9), inset 4px 4px 8px rgba(184,190,204,0.4)" }}
+                >
+                  <span style={{ color: "#1a56b0" }}>{f.icon}</span>
+                  <span className="text-xs font-medium" style={{ color: "#6a6a6a" }}>{f.text}</span>
+                </div>
+              ))}
+            </div>
+
             <div className="space-y-3.5">
               <IconInput
                 icon={<UserIcon size={17} />}
@@ -765,10 +795,10 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
             <button
               type="button"
               onClick={() => { setRegistering(false); setRegForm({ username: "", password: "", confirm: "" }); setRegError(""); }}
-              className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors"
+              className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
               style={{ color: "#9a9a9a" }}
             >
-              {t("alreadyHaveAccount")}
+              <ArrowLeft size={13} /> {t("alreadyHaveAccount")}
             </button>
           </div>
         </div>
