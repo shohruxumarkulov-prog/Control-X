@@ -227,9 +227,9 @@ const FONT_SCALES = [
 
 const PALETTES = {
   dark: {
-    "--bg-app": "#101317",
+    "--bg-app": "#181c22",
     "--bg-card": "#181c22",
-    "--bg-panel": "#13161b",
+    "--bg-panel": "#181c22",
     "--border": "#242a32",
     "--border-input": "#333b45",
     "--border-soft": "#1c2129",
@@ -237,22 +237,22 @@ const PALETTES = {
     "--text-secondary": "#8d97a3",
     "--text-muted": "#69727e",
     "--text-faint": "#5b6470",
-    "--shadow-hi": "rgba(255,255,255,0.03)",
-    "--shadow-lo": "rgba(0,0,0,0.4)",
+    "--shadow-hi": "rgba(255,255,255,0.035)",
+    "--shadow-lo": "rgba(0,0,0,0.5)",
   },
   light: {
-    "--bg-app": "#eef0f3",
-    "--bg-card": "#ffffff",
-    "--bg-panel": "#ffffff",
+    "--bg-app": "#e8e8e8",
+    "--bg-card": "#e8e8e8",
+    "--bg-panel": "#e8e8e8",
     "--border": "#e0e3e8",
     "--border-input": "#c5cbd4",
     "--border-soft": "#e9ecf0",
-    "--text-primary": "#181c22",
-    "--text-secondary": "#565f6b",
-    "--text-muted": "#707886",
-    "--text-faint": "#78808c",
-    "--shadow-hi": "rgba(255,255,255,0.85)",
-    "--shadow-lo": "rgba(163,169,184,0.4)",
+    "--text-primary": "#3f3f3f",
+    "--text-secondary": "#6a6a6a",
+    "--text-muted": "#8a8a8a",
+    "--text-faint": "#9a9a9a",
+    "--shadow-hi": "rgba(255,255,255,0.95)",
+    "--shadow-lo": "rgba(163,169,184,0.55)",
   },
 };
 
@@ -360,7 +360,7 @@ function Field({ label, value, onChange, type = "text" }) {
           type={isPassword ? (reveal ? "text" : "password") : type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full px-3 py-2.5 ${isPassword ? "pr-10" : ""} rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors`}
+          className={`w-full px-3 py-2.5 ${isPassword ? "pr-10" : ""} rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors`}
         />
         {isPassword && (
           <button
@@ -453,7 +453,7 @@ function MoneyField({ label, value, onChange, suffix }) {
           value={display}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
           placeholder="0"
-          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm font-mono tabular-nums outline-none focus:border-[var(--accent)] transition-colors`}
+          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm font-mono tabular-nums outline-none focus:border-[var(--accent)] transition-colors`}
         />
         {suffix && (
           <span className="absolute right-3 top-0 h-full flex items-center text-[var(--text-muted)] text-xs">{suffix}</span>
@@ -472,7 +472,7 @@ function Stat({ label, value, tone = "default", icon }) {
   const valueLength = String(value).length;
   const sizeClass = valueLength > 13 ? "text-xs" : valueLength > 10 ? "text-sm" : valueLength > 8 ? "text-base" : "text-lg";
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm min-w-0 overflow-hidden">
+    <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4 min-w-0 overflow-hidden">
       <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-1.5 leading-snug">
         {icon}<span>{label}</span>
       </div>
@@ -526,7 +526,7 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, 
 function TelegramPromptModal({ phase, onLink, onSkip, busy }) {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
-      <div className="w-full max-w-sm bg-[var(--bg-panel)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl text-center">
+      <div className="w-full max-w-sm bg-[var(--bg-panel)] neu-raised rounded-2xl p-6 text-center">
         {phase === "success" ? (
           <>
             <div
@@ -1020,7 +1020,7 @@ function CopyButton({ text }) {
     <button
       type="button"
       onClick={doCopy}
-      className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#3a4552] text-[11px] transition-colors shrink-0"
+      className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[11px] transition-colors shrink-0"
     >
       {copied ? <Check size={12} className="text-[var(--good)]" /> : <Copy size={12} />}
       {copied ? t("copied") : t("copy")}
@@ -1079,7 +1079,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
   }
 
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-[var(--bg-card)] neu-raised rounded-xl overflow-hidden">
       {showPhoto && <Lightbox src={emp.avatar} name={emp.name} onClose={() => setShowPhoto(false)} />}
       <div className="p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -1127,7 +1127,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
             <KeyRound size={12} /> {t("credentialsHeader")}
           </div>
 
-          <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg px-3 py-2">
+          <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] neu-inset rounded-lg px-3 py-2">
             <div className="min-w-0">
               <div className="text-[10px] text-[var(--text-muted)]">{t("login")}</div>
               <div className="text-[var(--text-primary)] text-sm truncate">{emp.username}</div>
@@ -1139,19 +1139,19 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
             <button
               type="button"
               onClick={() => { setResetOpen(true); setResetMsg(""); }}
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
             >
               <KeyRound size={13} /> Parolni tiklash
             </button>
           ) : (
-            <div className="bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg p-3 space-y-2">
+            <div className="bg-[var(--bg-app)] neu-inset rounded-lg p-3 space-y-2">
               <Field label="Yangi parol" type="password" value={resetPw} onChange={setResetPw} />
               {resetMsg && <p className="text-[var(--text-secondary)] text-xs">{resetMsg}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={submitReset} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
                   {t("save")}
                 </button>
-                <button type="button" onClick={() => { setResetOpen(false); setResetPw(""); }} className="flex-1 py-2 rounded-lg bg-transparent border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => { setResetOpen(false); setResetPw(""); }} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
                   {t("cancel")}
                 </button>
               </div>
@@ -1162,7 +1162,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
             <Wallet size={12} /> {t("dailyWage")}
           </div>
           {!editingWage ? (
-            <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg px-3 py-2">
+            <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] neu-inset rounded-lg px-3 py-2">
               <div className="text-[var(--text-primary)] text-sm font-mono tabular-nums">{fmt(emp.dailyWage)}{t("perDay")}</div>
               <button
                 type="button"
@@ -1174,13 +1174,13 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
               </button>
             </div>
           ) : (
-            <div className="bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg p-3 space-y-2">
+            <div className="bg-[var(--bg-app)] neu-inset rounded-lg p-3 space-y-2">
               <MoneyField label={t("newDailyWage")} value={wageDraft} onChange={setWageDraft} suffix="so'm" />
               <div className="flex gap-2">
                 <button type="button" onClick={saveWage} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
                   {t("save")}
                 </button>
-                <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg bg-transparent border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
                   {t("cancel")}
                 </button>
               </div>
@@ -1223,7 +1223,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
                 <button type="button" onClick={onDelete} className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity">
                   {t("yesDelete")}
                 </button>
-                <button type="button" onClick={() => setConfirmDelete(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => setConfirmDelete(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
                   {t("cancel")}
                 </button>
               </div>
@@ -1256,7 +1256,7 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] border-l border-[var(--border)] shadow-2xl z-40 overflow-y-auto transition-transform duration-200 ${
+        className={`fixed top-0 right-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] neu-raised z-40 overflow-y-auto transition-transform duration-200 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -1288,7 +1288,7 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5"
+              className="bg-[var(--bg-card)] neu-raised rounded-xl p-3.5"
               style={!n.is_read ? { borderColor: "var(--accent)" } : undefined}
             >
               <div className="flex items-center justify-between gap-2 mb-1">
@@ -1400,7 +1400,7 @@ function ProfileDrawer({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
       )}
       <div
-        className={`fixed top-0 left-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] border-r border-[var(--border)] shadow-2xl z-40 overflow-y-auto transition-transform duration-200 ${
+        className={`fixed top-0 left-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] neu-raised z-40 overflow-y-auto transition-transform duration-200 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -1629,7 +1629,7 @@ function ProfileDrawer({
                   <button
                     type="button"
                     onClick={() => { setConfirmDeleteAcc(false); setDeletePwInput(""); setDeletePwError(""); }}
-                    className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+                    className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
                   >
                     {t("cancel")}
                   </button>
@@ -1721,7 +1721,7 @@ function AdminApp({
 
   const bottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
-      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md neu-raised rounded-full px-1.5 py-1">
         {tabs.map((tab) => {
           const active = adminTab === tab.id;
           return (
@@ -1804,7 +1804,7 @@ function AdminApp({
               <UserPlus size={16} /> {t("addEmployeeHeader")}
             </button>
           ) : (
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                   <UserPlus size={15} /> {t("addEmployeeHeader")}
@@ -1840,7 +1840,7 @@ function AdminApp({
                 value={empSearch}
                 onChange={(e) => setEmpSearch(e.target.value)}
                 placeholder="Ism bo'yicha qidirish..."
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
               />
             </div>
           )}
@@ -1873,7 +1873,7 @@ function AdminApp({
 
       {adminTab === "attendance" && (
         <div className="space-y-4">
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+          <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                 <Calendar size={15} /> {t("markAttendanceHeader")}
@@ -1883,7 +1883,7 @@ function AdminApp({
               <button
                 type="button"
                 onClick={() => setWeekOffset((w) => w - 1)}
-                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] transition-colors"
+                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset transition-colors"
                 aria-label="prev week"
               >
                 <ChevronLeft size={16} />
@@ -1937,7 +1937,7 @@ function AdminApp({
               <button
                 type="button"
                 onClick={() => setWeekOffset((w) => w + 1)}
-                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] transition-colors"
+                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset transition-colors"
                 aria-label="next week"
               >
                 <ChevronRight size={16} />
@@ -1998,7 +1998,7 @@ function AdminApp({
                     <button
                       type="button"
                       onClick={() => setPendingBulk(null)}
-                      className="px-3 py-1.5 rounded-md bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-[11px] font-medium"
+                      className="px-3 py-1.5 rounded-md bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-[11px] font-medium"
                     >
                       {t("cancel")}
                     </button>
@@ -2013,7 +2013,7 @@ function AdminApp({
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
             )}
             {visibleEmployees.length > 0 && attDate > todayISO() && (
-              <p className="text-[var(--warn)] text-xs text-center py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">{t("futureDateWarning")}</p>
+              <p className="text-[var(--warn)] text-xs text-center py-2 bg-[var(--bg-card)] neu-raised rounded-lg">{t("futureDateWarning")}</p>
             )}
             {visibleEmployees.map((emp) => {
               const hasEntry = attendance[emp.id]?.[attDate] !== undefined;
@@ -2042,7 +2042,7 @@ function AdminApp({
                   type="button"
                   disabled={isFuture}
                   onClick={cycleStatus}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3.5 shadow-sm flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
+                  className="w-full bg-[var(--bg-card)] neu-raised rounded-xl p-3.5 flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Avatar src={emp.avatar} name={emp.name} size={32} />
@@ -2069,7 +2069,7 @@ function AdminApp({
 
       {adminTab === "advances" && (
         <div className="space-y-5">
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+          <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
             <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold mb-4">
               <Wallet size={15} /> {t("giveAdvanceHeader")}
             </div>
@@ -2095,7 +2095,7 @@ function AdminApp({
               <div className="col-span-2">
                 <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("employee")}</label>
                 <select value={advEmp} onChange={(e) => setAdvEmp(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)]">
+                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)]">
                   <option value="">{t("selectPlaceholder")}</option>
                   {myEmployees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
@@ -2112,7 +2112,7 @@ function AdminApp({
           </div>
 
           {advEmp && (
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
               <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("advanceHistory")}</div>
               {(advances[advEmp] || []).length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvances")}</p>}
               <div className="space-y-2">
@@ -2147,7 +2147,7 @@ function AdminApp({
               return sum + (r > 0 ? r : 0);
             }, 0);
             return (
-              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm text-center">
+              <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-6 text-center">
                 <div className="text-[var(--text-muted)] text-xs mb-1.5">Jami to'lash kerak</div>
                 <div className={`text-3xl font-bold font-mono tabular-nums ${totalOwed > 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
                   {fmt(totalOwed)}
@@ -2155,7 +2155,7 @@ function AdminApp({
               </div>
             );
           })()}
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-[var(--bg-card)] neu-raised rounded-xl overflow-hidden">
           <div className="p-5 pb-3 flex items-center justify-between gap-2">
             <div className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
               <ClipboardList size={15} /> {t("reportHeader")}
@@ -2290,7 +2290,7 @@ function EmployeeApp({
   ];
   const empBottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
-      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md neu-raised rounded-full px-1.5 py-1">
         {empTabs.map((tab) => {
           const active = empTab === tab.id;
           return (
@@ -2341,7 +2341,7 @@ function EmployeeApp({
       >
         {empTab === "umumiy" && (
           <div className="tab-transition space-y-3">
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm text-center">
+            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-6 text-center">
               <div className="flex items-center justify-center gap-1.5 text-[var(--text-muted)] text-xs mb-1.5">
                 <Wallet size={13} /> {t("statRemainingSalary")}
               </div>
@@ -2381,13 +2381,13 @@ function EmployeeApp({
 
           return (
             <div className="tab-transition space-y-3">
-              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+              <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <button type="button" onClick={() => setAttMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)]">
+                  <button type="button" onClick={() => setAttMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset">
                     <ChevronLeft size={15} />
                   </button>
                   <span className="text-[var(--text-primary)] text-sm font-semibold capitalize">{monthLabel}</span>
-                  <button type="button" onClick={() => setAttMonthOffset((o) => Math.min(0, o + 1))} disabled={attMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] disabled:opacity-30">
+                  <button type="button" onClick={() => setAttMonthOffset((o) => Math.min(0, o + 1))} disabled={attMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset disabled:opacity-30">
                     <ChevronRight size={15} />
                   </button>
                 </div>
@@ -2483,12 +2483,12 @@ function EmployeeApp({
               </div>
 
               {filteredAdv.length === 0 && (
-                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 shadow-sm text-center">
+                <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-8 text-center">
                   <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
                 </div>
               )}
               {filteredAdv.slice().reverse().map((a) => (
-                <div key={a.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-2.5 shadow-sm flex items-center gap-2.5">
+                <div key={a.id} className="bg-[var(--bg-card)] neu-raised rounded-xl p-2.5 flex items-center gap-2.5">
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                     style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
@@ -3149,6 +3149,22 @@ function WorkforceAppInner() {
             to { opacity: 1; transform: translateY(0); }
           }
           .tab-transition { animation: fadeSlideIn 0.28s ease-out; }
+
+          /* YANGI: butun ilova bo'ylab yumshoq (neumorphic) uslub — login
+             ekranidagi kabi. Barcha "kartochka"lar bir xil fonga ega bo'lib,
+             faqat yorug'/qorong'i soyalar orqali "ko'tarilgan" yoki
+             "botiq" ko'rinishga ega bo'ladi. */
+          .neu-raised {
+            box-shadow: -7px -7px 14px var(--shadow-hi), 7px 7px 14px var(--shadow-lo);
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+          }
+          .neu-inset {
+            box-shadow: inset -4px -4px 8px var(--shadow-hi), inset 4px 4px 8px var(--shadow-lo);
+          }
+          button.neu-raised:active {
+            box-shadow: inset -4px -4px 8px var(--shadow-hi), inset 4px 4px 8px var(--shadow-lo);
+            transform: translateY(1px);
+          }
 
           button:focus-visible,
           select:focus-visible,
