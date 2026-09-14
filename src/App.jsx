@@ -177,7 +177,7 @@ const STR = {
   registerSubtitle: { uz: "O'z login-parolingizni o'ylab toping va o'z ishchilaringizni boshqaring", ru: "Придумайте свой логин и пароль и управляйте своими сотрудниками", en: "Choose your own username and password to manage your own employees" },
   chooseLogin: { uz: "Login o'ylab toping", ru: "Придумайте логин", en: "Choose a username" },
   choosePassword: { uz: "Parol o'ylab toping", ru: "Придумайте пароль", en: "Choose a password" },
-  createAccountBtn: { uz: "Boshqaruvchi bo'lib ro'yxatdan o'tish", ru: "Зарегистрироваться руководителем", en: "Register as manager" },
+  createAccountBtn: { uz: "Ro'yxatdan o'tish", ru: "Зарегистрироваться", en: "Register" },
   alreadyHaveAccount: { uz: "Mavjud hisobga kirish", ru: "Войти в существующий аккаунт", en: "Sign in to an existing account" },
   newHere: { uz: "Birinchi marta kiryapsizmi?", ru: "Впервые здесь?", en: "First time here?" },
   deleteAccount: { uz: "Akkauntni o'chirish", ru: "Удалить аккаунт", en: "Delete account" },
@@ -302,6 +302,27 @@ class AppErrorBoundary extends Component {
     }
     return this.props.children;
   }
+}
+
+// YANGI: supabase.functions.invoke() xato qaytarganda, Supabase JS kutubxonasi
+// odatda umumiy "Edge Function returned a non-2xx status code" kabi tushunarsiz
+// xabar beradi va funksiyaning o'zi yozgan aniq xabarni (masalan "Bu login
+// band") yashirib qo'yadi. Bu yordamchi funksiya asl JSON javobni o'qib,
+// foydalanuvchiga tushunarli xabarni chiqarib beradi.
+async function invokeFn(name, body) {
+  const { data, error } = await supabase.functions.invoke(name, body !== undefined ? { body } : undefined);
+  if (error) {
+    let message = error.message || String(error);
+    try {
+      if (error.context && typeof error.context.json === "function") {
+        const body2 = await error.context.json();
+        if (body2 && body2.error) message = body2.error;
+      }
+    } catch (e) {}
+    return { data: null, error: message };
+  }
+  if (data && data.error) return { data: null, error: data.error };
+  return { data, error: null };
 }
 
 function fileToAvatarDataUrl(file) {
@@ -562,49 +583,6 @@ function TelegramPromptModal({ phase, onLink, onSkip, busy }) {
   );
 }
 
-function RecoveryCodeModal({ code, onClose }) {
-  const [copied, setCopied] = useState(false);
-  async function doCopy() {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (e) {}
-  }
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
-      <div className="w-full max-w-sm bg-[var(--bg-panel)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl">
-        <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold text-base mb-1.5">
-          <KeyRound size={18} className="text-[var(--accent)]" /> Tiklash kodingiz
-        </div>
-        <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
-          Parolni unutsangiz, faqat shu kod orqali tiklay olasiz. Bu kod FAQAT hozir ko'rsatiladi — uni xavfsiz joyga yozib qo'ying.
-        </p>
-        <div className="bg-[var(--bg-app)] border border-[var(--border-input)] rounded-xl px-4 py-3 text-center font-mono text-lg tracking-widest text-[var(--text-primary)] mb-3 select-all">
-          {code}
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={doCopy}
-            className="flex-1 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium flex items-center justify-center gap-1.5"
-          >
-            {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Nusxalandi" : "Nusxalash"}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg text-[#12161c] text-xs font-semibold"
-            style={{ backgroundColor: "var(--accent)" }}
-          >
-            Saqladim, tushundim
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // YANGI: Telegram bot orqali parolni tiklash — ADMIN ham, ISHCHI ham shu bitta
 // formadan foydalanadi. Avval login kiritiladi (agar Telegram ulangan bo'lsa,
 // botga 6 xonali kod yuboriladi), keyin kod + yangi parol kiritiladi.
@@ -623,9 +601,9 @@ function TelegramResetForm({ onBack }) {
     if (!username.trim()) { setError("Login kiritilmagan"); return; }
     setBusy(true);
     try {
-      const { error: fnErr } = await supabase.functions.invoke("request-password-reset", { body: { username: username.trim() } });
+      const { error: fnErr } = await invokeFn("request-password-reset", { username: username.trim() });
       setBusy(false);
-      if (fnErr) { setError(String(fnErr.message || fnErr)); return; }
+      if (fnErr) { setError(fnErr); return; }
       setInfo("Agar Telegram ulangan bo'lsa, kod shu botga yuborildi. Telegramni tekshiring va kodni kiriting.");
       setStep("code");
     } catch (e) {
@@ -640,11 +618,9 @@ function TelegramResetForm({ onBack }) {
     if (!newPassword || newPassword.length < 6) { setError("Yangi parol kamida 6 belgidan iborat bo'lsin"); return; }
     setBusy(true);
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke("confirm-password-reset", {
-        body: { username: username.trim(), code: code.trim(), newPassword },
-      });
+      const { error: fnErr } = await invokeFn("confirm-password-reset", { username: username.trim(), code: code.trim(), newPassword });
       setBusy(false);
-      if (fnErr || data?.error) { setError(data?.error || String(fnErr?.message || fnErr)); return; }
+      if (fnErr) { setError(fnErr); return; }
       setStep("done");
     } catch (e) {
       setBusy(false);
@@ -811,11 +787,6 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
     );
   }
 
-  const features = [
-    { icon: <Users size={14} />, text: "Ishchilaringizni ro'yxatga oling" },
-    { icon: <Calendar size={14} />, text: "Har kungi davomatni belgilang" },
-    { icon: <Wallet size={14} />, text: "Avans va ish haqini hisoblang" },
-  ];
   const faceBase = { background: "#e8e8e8", boxShadow: cardShadow, gridArea: "1 / 1", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" };
 
   function startRegister() {
@@ -937,19 +908,6 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
                   O'z jamoangizni<br />boshqarishni boshlang
                 </h1>
                 <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
-
-                <div className="flex flex-col gap-2 mb-6">
-                  {features.map((f, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
-                      style={{ background: "#e8e8e8", boxShadow: "inset -4px -4px 8px rgba(255,255,255,0.9), inset 4px 4px 8px rgba(184,190,204,0.4)" }}
-                    >
-                      <span style={{ color: "#1a56b0" }}>{f.icon}</span>
-                      <span className="text-xs font-medium" style={{ color: "#6a6a6a" }}>{f.text}</span>
-                    </div>
-                  ))}
-                </div>
 
                 <UsernameCheckField
                   value={regForm.username}
@@ -2575,7 +2533,6 @@ function WorkforceAppInner() {
   const [advances, setAdvances] = useState({});
   const [session, setSession] = useState(null);
   const [currentUser, setCurrentUserState] = useState(null);
-  const [recoveryCodeToShow, setRecoveryCodeToShow] = useState(null);
   const [telegramPromptOpen, setTelegramPromptOpen] = useState(false);
   const [telegramPromptPhase, setTelegramPromptPhase] = useState("prompt"); // prompt | waiting | success
   const [telegramLinkBusy, setTelegramLinkBusy] = useState(false);
@@ -2712,18 +2669,13 @@ function WorkforceAppInner() {
     };
   }, [fontScale]);
 
-  // Realtime: davomat/avans/profil o'zgarishlarini kuzatish
-  useEffect(() => {
-    if (!currentUser || !session) return;
-    const channel = supabase
-      .channel(`live_${currentUser.role}_${currentUser.id || currentUser.username}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () => loadAllData(session.user))
-      .on("postgres_changes", { event: "*", schema: "public", table: "advances" }, () => loadAllData(session.user))
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => loadAllData(session.user))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id, currentUser?.username, session?.user?.id]);
+  // FIX: avval bu yerda "attendance/advances/profiles" jadvallarini kuzatib
+  // turadigan realtime subscription bor edi, u har o'zgarishda BUTUN
+  // ma'lumotni qayta yuklardi. Muammo shu edi: har bir amal (masalan davomat
+  // belgilash) ham o'zi to'g'ridan-to'g'ri qayta yuklardi, HAM shu realtime
+  // signal orqali yana bir marta yuklanardi — ikkitasi bir vaqtda to'qnashib,
+  // tez-tez bosilganda ilova "qotib qolar" edi. Endi faqat aniq amaldan keyingi
+  // bitta yuklash yetarli, realtime esa olib tashlandi.
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== "admin") return;
@@ -2790,11 +2742,9 @@ function WorkforceAppInner() {
 
   async function registerAdmin(newUsername, newPassword) {
     try {
-      const { data, error } = await supabase.functions.invoke("register-admin", {
-        body: { username: newUsername, password: newPassword },
-      });
-      if (error || data?.error) {
-        return { error: data?.error || String(error?.message || error) };
+      const { error } = await invokeFn("register-admin", { username: newUsername, password: newPassword });
+      if (error) {
+        return { error };
       }
       const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
         email: `${newUsername.toLowerCase()}@nazoratplus.internal`,
@@ -2805,11 +2755,7 @@ function WorkforceAppInner() {
       }
       setSession(signInData.session);
       await loadAllData(signInData.session.user);
-      if (data.recoveryCode) {
-        setRecoveryCodeToShow(data.recoveryCode);
-      } else {
-        setTelegramPromptOpen(true);
-      }
+      setTelegramPromptOpen(true);
       return {};
     } catch (err) {
       return { error: String(err && err.message ? err.message : err) };
@@ -2856,11 +2802,11 @@ function WorkforceAppInner() {
       setEmpError(makeT(lang)("fillAllFields"));
       return false;
     }
-    const { data, error } = await supabase.functions.invoke("create-employee", {
-      body: { name: newEmp.name, username: newEmp.username, password: newEmp.password, dailyWage: Number(newEmp.dailyWage) },
+    const { error } = await invokeFn("create-employee", {
+      name: newEmp.name, username: newEmp.username, password: newEmp.password, dailyWage: Number(newEmp.dailyWage),
     });
-    if (error || data?.error) {
-      setEmpError(data?.error || String(error?.message || error));
+    if (error) {
+      setEmpError(error);
       return false;
     }
     setNewEmp({ name: "", username: "", password: "", dailyWage: "" });
@@ -2870,7 +2816,7 @@ function WorkforceAppInner() {
   }
 
   async function deleteEmployee(id) {
-    const { error } = await supabase.functions.invoke("delete-employee", { body: { employeeId: id } });
+    const { error } = await invokeFn("delete-employee", { employeeId: id });
     if (error) { console.error(error); return; }
     if (advEmp === id) setAdvEmp("");
     await loadAllData(session.user);
@@ -2883,10 +2829,8 @@ function WorkforceAppInner() {
   }
 
   async function resetEmployeePassword(id, newPassword) {
-    const { data, error } = await supabase.functions.invoke("reset-employee-password", {
-      body: { employeeId: id, newPassword },
-    });
-    if (error || data?.error) return { error: data?.error || String(error?.message || error) };
+    const { error } = await invokeFn("reset-employee-password", { employeeId: id, newPassword });
+    if (error) return { error };
     return {};
   }
 
@@ -2898,16 +2842,32 @@ function WorkforceAppInner() {
     if (attDate > todayISO()) return;
     const currentRaw = attendance[empId]?.[attDate];
     const currentStatus = currentRaw !== undefined ? attEntryStatus(currentRaw) : null;
+    // FIX: avval har bosishda BUTUN ma'lumot serverdan qayta so'ralardi —
+    // tez-tez bosilganda so'rovlar to'planib, ilova "qotib qolardi". Endi
+    // ekrandagi holatni DARHOL (optimistik) yangilaymiz, DB yozuvi orqa fonda
+    // ketadi. Xato bo'lsa, eski holatga qaytariladi.
+    const prevAttendance = attendance;
     if (currentStatus === status) {
-      await supabase.from("attendance").delete().eq("employee_id", empId).eq("date", attDate);
+      setAttendance((prev) => {
+        const dayMap = { ...(prev[empId] || {}) };
+        delete dayMap[attDate];
+        return { ...prev, [empId]: dayMap };
+      });
+      const { error } = await supabase.from("attendance").delete().eq("employee_id", empId).eq("date", attDate);
+      if (error) setAttendance(prevAttendance);
     } else {
       const emp = usersData.employees.find((e) => e.id === empId);
-      await supabase.from("attendance").upsert(
-        { employee_id: empId, date: attDate, status, wage_at_time: Number(emp ? emp.dailyWage : 0) },
+      const wage = Number(emp ? emp.dailyWage : 0);
+      setAttendance((prev) => ({
+        ...prev,
+        [empId]: { ...(prev[empId] || {}), [attDate]: { v: status, wage } },
+      }));
+      const { error } = await supabase.from("attendance").upsert(
+        { employee_id: empId, date: attDate, status, wage_at_time: wage },
         { onConflict: "employee_id,date" }
       );
+      if (error) setAttendance(prevAttendance);
     }
-    await loadAllData(session.user);
   }
 
   async function bulkMarkAttendance(empIds, status) {
@@ -2917,8 +2877,16 @@ function WorkforceAppInner() {
       const wage = emp ? wageForDate(emp, attDate) : 0;
       return { employee_id: id, date: attDate, status, wage_at_time: Number(wage || 0) };
     });
-    await supabase.from("attendance").upsert(rows, { onConflict: "employee_id,date" });
-    await loadAllData(session.user);
+    const prevAttendance = attendance;
+    setAttendance((prev) => {
+      const next = { ...prev };
+      rows.forEach((r) => {
+        next[r.employee_id] = { ...(next[r.employee_id] || {}), [r.date]: { v: r.status, wage: r.wage_at_time } };
+      });
+      return next;
+    });
+    const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "employee_id,date" });
+    if (error) setAttendance(prevAttendance);
   }
 
   // ============================================================================
@@ -2928,16 +2896,21 @@ function WorkforceAppInner() {
   async function addAdvance() {
     const amountNum = Number(advForm.amount);
     if (!advEmp || !advForm.amount || !Number.isFinite(amountNum) || amountNum <= 0) return;
-    await supabase.from("advances").insert({
+    const { data, error } = await supabase.from("advances").insert({
       employee_id: advEmp, amount: amountNum, date: advForm.date, note: advForm.note || null, type: advForm.type || "avans",
-    });
+    }).select().single();
     setAdvForm({ amount: "", date: todayISO(), note: "", type: advForm.type || "avans" });
-    await loadAllData(session.user);
+    if (!error && data) {
+      setAdvances((prev) => ({
+        ...prev,
+        [advEmp]: [...(prev[advEmp] || []), { id: data.id, amount: Number(data.amount), date: data.date, note: data.note, type: data.type }],
+      }));
+    }
   }
 
   async function deleteAdvance(empId, advId) {
+    setAdvances((prev) => ({ ...prev, [empId]: (prev[empId] || []).filter((a) => a.id !== advId) }));
     await supabase.from("advances").delete().eq("id", advId);
-    await loadAllData(session.user);
   }
 
   // ============================================================================
@@ -2978,8 +2951,8 @@ function WorkforceAppInner() {
   async function deleteOwnAccount(currentPassword) {
     const ok = await verifyCurrentPassword(currentPassword);
     if (!ok) return { error: makeT(lang)("errWrongCurrentPassword") };
-    const { error } = await supabase.functions.invoke("delete-account");
-    if (error) return { error: String(error.message || error) };
+    const { error } = await invokeFn("delete-account");
+    if (error) return { error };
     logout();
     return {};
   }
@@ -2996,9 +2969,9 @@ function WorkforceAppInner() {
 
   async function linkTelegram() {
     try {
-      const { data, error } = await supabase.functions.invoke("telegram-link-start");
-      if (error || data?.error) {
-        return { error: data?.error || String(error?.message || error) };
+      const { data, error } = await invokeFn("telegram-link-start");
+      if (error) {
+        return { error };
       }
       window.open(data.linkUrl, "_blank");
       startTelegramLinkPolling();
@@ -3187,12 +3160,6 @@ function WorkforceAppInner() {
           }
         `}</style>
         {screen}
-        {recoveryCodeToShow && (
-          <RecoveryCodeModal
-            code={recoveryCodeToShow}
-            onClose={() => { setRecoveryCodeToShow(null); setTelegramPromptOpen(true); }}
-          />
-        )}
         {telegramPromptOpen && (
           <TelegramPromptModal
             phase={telegramPromptPhase}
