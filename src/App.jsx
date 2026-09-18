@@ -177,7 +177,7 @@ const STR = {
   registerSubtitle: { uz: "O'z login-parolingizni o'ylab toping va o'z ishchilaringizni boshqaring", ru: "Придумайте свой логин и пароль и управляйте своими сотрудниками", en: "Choose your own username and password to manage your own employees" },
   chooseLogin: { uz: "Login o'ylab toping", ru: "Придумайте логин", en: "Choose a username" },
   choosePassword: { uz: "Parol o'ylab toping", ru: "Придумайте пароль", en: "Choose a password" },
-  createAccountBtn: { uz: "Ro'yxatdan o'tish", ru: "Зарегистрироваться", en: "Register" },
+  createAccountBtn: { uz: "Boshqaruvchi bo'lib ro'yxatdan o'tish", ru: "Зарегистрироваться руководителем", en: "Register as manager" },
   alreadyHaveAccount: { uz: "Mavjud hisobga kirish", ru: "Войти в существующий аккаунт", en: "Sign in to an existing account" },
   newHere: { uz: "Birinchi marta kiryapsizmi?", ru: "Впервые здесь?", en: "First time here?" },
   deleteAccount: { uz: "Akkauntni o'chirish", ru: "Удалить аккаунт", en: "Delete account" },
@@ -227,9 +227,9 @@ const FONT_SCALES = [
 
 const PALETTES = {
   dark: {
-    "--bg-app": "#181c22",
+    "--bg-app": "#101317",
     "--bg-card": "#181c22",
-    "--bg-panel": "#181c22",
+    "--bg-panel": "#13161b",
     "--border": "#242a32",
     "--border-input": "#333b45",
     "--border-soft": "#1c2129",
@@ -237,25 +237,22 @@ const PALETTES = {
     "--text-secondary": "#8d97a3",
     "--text-muted": "#69727e",
     "--text-faint": "#5b6470",
-    "--shadow-hi": "rgba(255,255,255,0.035)",
-    "--shadow-lo": "rgba(0,0,0,0.5)",
   },
   light: {
-    "--bg-app": "#e8e8e8",
-    "--bg-card": "#e8e8e8",
-    "--bg-panel": "#e8e8e8",
+    "--bg-app": "#eef0f3",
+    "--bg-card": "#ffffff",
+    "--bg-panel": "#ffffff",
     "--border": "#e0e3e8",
     "--border-input": "#c5cbd4",
     "--border-soft": "#e9ecf0",
-    "--text-primary": "#3f3f3f",
-    "--text-secondary": "#6a6a6a",
-    "--text-muted": "#8a8a8a",
-    "--text-faint": "#9a9a9a",
-    "--shadow-hi": "rgba(255,255,255,0.95)",
-    "--shadow-lo": "rgba(163,169,184,0.55)",
+    "--text-primary": "#181c22",
+    "--text-secondary": "#565f6b",
+    "--text-muted": "#707886",
+    "--text-faint": "#78808c",
   },
 };
 
+const ADMIN_DEFAULT = { username: "admin", password: "admin123" };
 const VAPID_PUBLIC_KEY = "BJHw7YqggwDUKfjS9pOcZyA_y7MO_46FWaRKv-fF8zr71CDEycK7hlEzq_hq4IzW7VhzysMJFZ-jXP4ULEYzn3k";
 
 function urlBase64ToUint8Array(base64String) {
@@ -304,25 +301,30 @@ class AppErrorBoundary extends Component {
   }
 }
 
-// YANGI: supabase.functions.invoke() xato qaytarganda, Supabase JS kutubxonasi
-// odatda umumiy "Edge Function returned a non-2xx status code" kabi tushunarsiz
-// xabar beradi va funksiyaning o'zi yozgan aniq xabarni (masalan "Bu login
-// band") yashirib qo'yadi. Bu yordamchi funksiya asl JSON javobni o'qib,
-// foydalanuvchiga tushunarli xabarni chiqarib beradi.
-async function invokeFn(name, body) {
-  const { data, error } = await supabase.functions.invoke(name, body !== undefined ? { body } : undefined);
-  if (error) {
-    let message = error.message || String(error);
-    try {
-      if (error.context && typeof error.context.json === "function") {
-        const body2 = await error.context.json();
-        if (body2 && body2.error) message = body2.error;
-      }
-    } catch (e) {}
-    return { data: null, error: message };
+const memoryStore = {};
+
+async function safeGet(key) {
+  try {
+    const { data, error } = await supabase
+      .from("app_storage")
+      .select("value")
+      .eq("key", key)
+      .maybeSingle();
+    if (!error && data && typeof data.value !== "undefined") {
+      memoryStore[key] = data.value;
+      return data.value;
+    }
+  } catch (e) {
   }
-  if (data && data.error) return { data: null, error: data.error };
-  return { data, error: null };
+  return memoryStore[key];
+}
+
+async function safeSet(key, value) {
+  memoryStore[key] = value;
+  try {
+    await supabase.from("app_storage").upsert({ key, value, updated_at: new Date().toISOString() });
+  } catch (e) {
+  }
 }
 
 function fileToAvatarDataUrl(file) {
@@ -360,7 +362,7 @@ function Field({ label, value, onChange, type = "text" }) {
           type={isPassword ? (reveal ? "text" : "password") : type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full px-3 py-2.5 ${isPassword ? "pr-10" : ""} rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors`}
+          className={`w-full px-3 py-2.5 ${isPassword ? "pr-10" : ""} rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors`}
         />
         {isPassword && (
           <button
@@ -379,15 +381,9 @@ function Field({ label, value, onChange, type = "text" }) {
 // YANGI: rasmga o'xshab, dumaloq (pill) ko'rinishdagi, ichida ikonka bo'lgan input.
 // Login ekranida foydalaniladi — label yo'q, o'rniga placeholder ishlatiladi.
 function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDown, autoFocus, showToggle, toggleIcon, onToggle }) {
-  const [focused, setFocused] = useState(false);
-  const baseShadow = "inset -6px -6px 10px rgba(255,255,255,0.95), inset 6px 6px 10px rgba(184,190,204,0.45)";
-  const focusShadow = "inset 3px 3px 6px rgba(20,60,140,0.35), inset -3px -3px 6px rgba(70,130,220,0.25)";
   return (
     <div className="relative">
-      <span
-        className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-300"
-        style={{ color: focused ? "#1a56b0" : "#909090" }}
-      >
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">
         {icon}
       </span>
       <input
@@ -397,16 +393,13 @@ function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDow
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-2xl bg-[#e8e8e8] text-[#4a4a4a] text-sm font-medium outline-none border-none transition-all duration-300 placeholder:text-[#a3a3a3]`}
-        style={{ boxShadow: focused ? focusShadow : baseShadow, transform: focused ? "translateY(-2px)" : "translateY(0)" }}
+        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-full bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text-muted)]`}
       />
       {showToggle && (
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-[#909090] hover:text-[#a10f0f] transition-colors"
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
         >
           {toggleIcon}
         </button>
@@ -414,27 +407,20 @@ function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDow
     </div>
   );
 }
+
 // YANGI: "Meni eslab qol" uchun kichik dumaloq svitch (toggle).
-function ToggleSwitch({ checked, onChange }) {
+function ToggleSwitch({ checked, onChange, accent }) {
   return (
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="relative w-8 h-[18px] rounded-full shrink-0 bg-[#e8e8e8] transition-all duration-300"
-      style={{
-        boxShadow: checked
-          ? "inset 3px 3px 6px rgba(20,60,140,0.35), inset -3px -3px 6px rgba(70,130,220,0.25)"
-          : "inset 3px 3px 6px rgba(184,190,204,0.5), inset -3px -3px 6px rgba(255,255,255,0.9)",
-      }}
+      className="relative w-9 h-5 rounded-full shrink-0 transition-colors"
+      style={{ backgroundColor: checked ? accent : "var(--border-input)" }}
       aria-pressed={checked}
     >
       <span
-        className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all duration-300"
-        style={{
-          left: checked ? "16px" : "2px",
-          backgroundColor: checked ? "#1a56b0" : "#e8e8e8",
-          boxShadow: "1px 1px 3px rgba(0,0,0,0.25)",
-        }}
+        className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all"
+        style={{ left: checked ? "18px" : "2px" }}
       />
     </button>
   );
@@ -453,7 +439,7 @@ function MoneyField({ label, value, onChange, suffix }) {
           value={display}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
           placeholder="0"
-          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm font-mono tabular-nums outline-none focus:border-[var(--accent)] transition-colors`}
+          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm font-mono tabular-nums outline-none focus:border-[var(--accent)] transition-colors`}
         />
         {suffix && (
           <span className="absolute right-3 top-0 h-full flex items-center text-[var(--text-muted)] text-xs">{suffix}</span>
@@ -472,7 +458,7 @@ function Stat({ label, value, tone = "default", icon }) {
   const valueLength = String(value).length;
   const sizeClass = valueLength > 13 ? "text-xs" : valueLength > 10 ? "text-sm" : valueLength > 8 ? "text-base" : "text-lg";
   return (
-    <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4 min-w-0 overflow-hidden">
+    <div className="card p-4 min-w-0 overflow-hidden">
       <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-1.5 leading-snug">
         {icon}<span>{label}</span>
       </div>
@@ -523,482 +509,179 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, 
   );
 }
 
-function TelegramPromptModal({ phase, onLink, onSkip, busy }) {
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
-      <div className="w-full max-w-sm bg-[var(--bg-panel)] neu-raised rounded-2xl p-6 text-center">
-        {phase === "success" ? (
-          <>
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
-              style={{ backgroundColor: "var(--good-soft)" }}
-            >
-              <Check size={28} style={{ color: "var(--good)" }} />
-            </div>
-            <div className="text-[var(--text-primary)] font-semibold text-base mb-1">Xush kelibsiz!</div>
-            <p className="text-[var(--text-secondary)] text-xs">Telegram muvaffaqiyatli ulandi.</p>
-          </>
-        ) : phase === "waiting" ? (
-          <>
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse"
-              style={{ backgroundColor: "rgba(42,169,222,0.15)" }}
-            >
-              <Send size={24} style={{ color: "#2aa9de" }} />
-            </div>
-            <div className="text-[var(--text-primary)] font-semibold text-base mb-1.5">Telegramda kuting...</div>
-            <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
-              Ochilgan botga o'ting va "Start" tugmasini bosing — bosishingiz bilan bu oyna avtomatik davom etadi.
-            </p>
-            <button type="button" onClick={onSkip} className="w-full py-2 text-xs font-medium text-[var(--text-muted)]">
-              Keyinroq
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-center gap-2 text-[var(--text-primary)] font-semibold text-base mb-1.5">
-              <Send size={18} className="text-[#2aa9de]" /> Xush kelibsiz!
-            </div>
-            <p className="text-[var(--text-secondary)] text-xs leading-snug mb-4">
-              Parolni (yoki loginni) unutib qolsangiz tiklay olishingiz uchun, hisobingizni Telegram botga ulab qo'ying — bir necha soniya vaqt oladi.
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onLink}
-                className="w-full py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
-                style={{ backgroundColor: "#2aa9de" }}
-              >
-                {busy ? "..." : "Telegramga ulash"}
-              </button>
-              <button type="button" onClick={onSkip} className="w-full py-2 text-xs font-medium text-[var(--text-muted)]">
-                Keyinroq
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// YANGI: Telegram bot orqali parolni tiklash — ADMIN ham, ISHCHI ham shu bitta
-// formadan foydalanadi. Avval login kiritiladi (agar Telegram ulangan bo'lsa,
-// botga 6 xonali kod yuboriladi), keyin kod + yangi parol kiritiladi.
-function TelegramResetForm({ onBack }) {
-  const [step, setStep] = useState("username"); // username -> code -> done
-  const [username, setUsername] = useState("");
-  const [code, setCode] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
-  const [busy, setBusy] = useState(false);
-  const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
-
-  async function submitUsername() {
-    setError("");
-    if (!username.trim()) { setError("Login kiritilmagan"); return; }
-    setBusy(true);
-    try {
-      const { error: fnErr } = await invokeFn("request-password-reset", { username: username.trim() });
-      setBusy(false);
-      if (fnErr) { setError(fnErr); return; }
-      setInfo("Agar Telegram ulangan bo'lsa, kod shu botga yuborildi. Telegramni tekshiring va kodni kiriting.");
-      setStep("code");
-    } catch (e) {
-      setBusy(false);
-      setError(String(e?.message || e));
-    }
-  }
-
-  async function submitCode() {
-    setError("");
-    if (!code.trim()) { setError("Kodni kiriting"); return; }
-    if (!newPassword || newPassword.length < 6) { setError("Yangi parol kamida 6 belgidan iborat bo'lsin"); return; }
-    setBusy(true);
-    try {
-      const { error: fnErr } = await invokeFn("confirm-password-reset", { username: username.trim(), code: code.trim(), newPassword });
-      setBusy(false);
-      if (fnErr) { setError(fnErr); return; }
-      setStep("done");
-    } catch (e) {
-      setBusy(false);
-      setError(String(e?.message || e));
-    }
-  }
-
-  if (step === "done") {
-    return (
-      <div className="space-y-3 text-center">
-        <p className="text-sm" style={{ color: "#2f9463" }}>Parol muvaffaqiyatli yangilandi! Endi yangi parol bilan kiring.</p>
-        <button type="button" onClick={onBack} className="w-full py-2.5 rounded-lg text-xs font-medium" style={{ background: "#e8e8e8", color: "#4a4a4a", boxShadow: btnShadowRest }}>
-          Kirish sahifasiga qaytish
-        </button>
-      </div>
-    );
-  }
-
-  if (step === "code") {
-    return (
-      <div className="space-y-3">
-        {info && <p className="text-xs text-center leading-snug" style={{ color: "#6a6a6a" }}>{info}</p>}
-        <IconInput icon={<KeyRound size={17} />} value={code} onChange={setCode} placeholder="Telegramdagi 6 xonali kod" />
-        <IconInput icon={<Lock size={17} />} type="password" value={newPassword} onChange={setNewPassword} placeholder="Yangi parol" />
-        {error && <p className="text-xs text-center" style={{ color: "#a10f0f" }}>{error}</p>}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={submitCode}
-          className="w-full py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest text-[#f5e9c8] disabled:opacity-60"
-          style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
-        >
-          {busy ? "Yuborilmoqda..." : "Parolni tiklash"}
-        </button>
-        <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>Ortga</button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-center text-sm mb-1 leading-snug" style={{ color: "#6a6a6a" }}>
-        Login kiriting — agar Telegram ulangan bo'lsa, tiklash kodi shu yerga yuboriladi.
-      </p>
-      <IconInput icon={<UserIcon size={17} />} value={username} onChange={setUsername} placeholder="Login" autoFocus />
-      <p className="text-center text-[11px] leading-snug" style={{ color: "#9a9a9a" }}>
-        Loginingizni ham unutgan bo'lsangiz — Telegramda botga <b>/login</b> deb yozing, u eslatib beradi.
-      </p>
-      {error && <p className="text-xs text-center" style={{ color: "#a10f0f" }}>{error}</p>}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={submitUsername}
-        className="w-full py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest text-[#f5e9c8] disabled:opacity-60"
-        style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
-      >
-        {busy ? "Yuborilmoqda..." : "Kodni yuborish"}
-      </button>
-      <button type="button" onClick={onBack} className="w-full py-2 text-xs font-medium" style={{ color: "#9a9a9a" }}>Ortga</button>
-    </div>
-  );
-}
-
-// YANGI: ro'yxatdan o'tishda login band/bo'shligini jonli (debounce bilan) tekshiradi.
-// Band bo'lsa — input tagida qizil ogohlantirish; bo'sh bo'lsa — inputning o'ng
-// tomonida yashil tick chiqadi.
-function UsernameCheckField({ value, onChange, onStatusChange, active }) {
-  const [status, setStatus] = useState("idle"); // idle | checking | available | taken | error
-
-  useEffect(() => {
-    if (!active) return;
-    const v = value.trim();
-    if (v.length < 3) {
-      setStatus("idle");
-      onStatusChange(false);
-      return;
-    }
-    setStatus("checking");
-    const handle = setTimeout(async () => {
-      try {
-        const { data, error } = await supabase.rpc("email_for_username", { p_username: v });
-        if (error) { setStatus("idle"); onStatusChange(false); return; }
-        if (data) { setStatus("taken"); onStatusChange(false); }
-        else { setStatus("available"); onStatusChange(true); }
-      } catch (e) {
-        setStatus("idle");
-        onStatusChange(false);
-      }
-    }, 450);
-    return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, active]);
-
-  return (
-    <div>
-      <IconInput
-        icon={<UserIcon size={17} />}
-        value={value}
-        onChange={onChange}
-        placeholder="Login o'ylab toping"
-        autoFocus={active}
-        showToggle={status === "available"}
-        toggleIcon={<Check size={16} style={{ color: "#2f9463" }} />}
-        onToggle={() => {}}
-      />
-      {status === "taken" && (
-        <p className="text-[11px] mt-1.5 pl-1" style={{ color: "#a10f0f" }}>Bu login allaqachon band, boshqasini tanlang</p>
-      )}
-      {status === "checking" && (
-        <p className="text-[11px] mt-1.5 pl-1" style={{ color: "#9a9a9a" }}>Tekshirilmoqda...</p>
-      )}
-    </div>
-  );
-}
-
-function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister, loginBusy }) {
+function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister }) {
   const [showPassword, setShowPassword] = useState(false);
+  const [asAdmin, setAsAdmin] = useState(false);
   const [registering, setRegistering] = useState(false);
-  const [regStep, setRegStep] = useState("username"); // "username" | "password"
-  const [usernameAvailable, setUsernameAvailable] = useState(false);
   const [regForm, setRegForm] = useState({ username: "", password: "", confirm: "" });
   const [regError, setRegError] = useState("");
-  const [regBusy, setRegBusy] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showForgotHint, setShowForgotHint] = useState(false);
-  const [forgotMode, setForgotMode] = useState(null); // null | 'choose' | 'employee' | 'admin'
-  const [btnHover, setBtnHover] = useState(false);
-  const { t } = useApp();
+  const { accent, t } = useApp();
 
-  async function submitRegister() {
+  function submitRegister() {
     setRegError("");
     if (regForm.password !== regForm.confirm) {
       setRegError(t("errPasswordMismatch"));
       return;
     }
-    setRegBusy(true);
-    const result = await onRegister(regForm.username.trim(), regForm.password);
-    setRegBusy(false);
+    const result = onRegister(regForm.username.trim(), regForm.password);
     if (result && result.error) {
       setRegError(result.error);
-      return;
     }
-    // Muvaffaqiyat: parent (WorkforceAppInner) currentUser'ni allaqachon o'rnatgan
-    // bo'ladi va ekranni AdminApp'ga almashtiradi; tiklash kodi/Telegram taklifi
-    // endi shu yerda emas, dastur darajasida (global overlay sifatida) ko'rsatiladi.
   }
 
-  const cardShadow = "-22px -22px 44px #ffffff, 22px 22px 50px #c3c3c3";
-  const titleShadow = "1px 1px 1px rgba(255,255,255,0.9), -2px -2px 1px rgba(163,163,163,0.25)";
-  const btnShadowRest = "-7px -7px 12px #f8f8f8, 7px 7px 12px #c8c8c8";
-  const btnShadowHover = "0 10px 22px rgba(20,60,140,0.35), -5px -5px 15px rgba(255,255,255,0.6)";
-
-  if (forgotMode) {
+  if (asAdmin && registering) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
+      <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
-          <div className="rounded-[32px] p-8" style={{ background: "#e8e8e8", boxShadow: cardShadow }}>
-            <h2 className="text-center text-lg font-bold mb-4" style={{ color: "#4a4a4a" }}>Parolni tiklash</h2>
-            <TelegramResetForm onBack={() => setForgotMode(null)} />
+          <div className="bg-[var(--bg-card)] rounded-[32px] shadow-xl p-8">
+            <h1 className="text-center text-2xl font-extrabold text-[var(--text-primary)] mb-1 tracking-tight">{t("registerTitle")}</h1>
+            <p className="text-center text-[var(--text-muted)] text-sm mb-7">{t("registerSubtitle")}</p>
+            <div className="space-y-3.5">
+              <IconInput
+                icon={<UserIcon size={17} />}
+                value={regForm.username}
+                onChange={(v) => setRegForm({ ...regForm, username: v })}
+                placeholder={t("chooseLogin")}
+              />
+              <IconInput
+                icon={<Lock size={17} />}
+                type={showRegPassword ? "text" : "password"}
+                value={regForm.password}
+                onChange={(v) => setRegForm({ ...regForm, password: v })}
+                placeholder={t("choosePassword")}
+                showToggle
+                toggleIcon={showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                onToggle={() => setShowRegPassword((v) => !v)}
+              />
+              <IconInput
+                icon={<Lock size={17} />}
+                type={showRegPassword ? "text" : "password"}
+                value={regForm.confirm}
+                onChange={(v) => setRegForm({ ...regForm, confirm: v })}
+                placeholder={t("repeatNewPassword")}
+              />
+            </div>
+            {regError && <p className="text-[var(--bad)] text-xs mt-3 text-center">{regError}</p>}
+            <button
+              type="button"
+              onClick={submitRegister}
+              className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-opacity hover:opacity-90 active:scale-[0.98]"
+              style={{ backgroundColor: "var(--text-primary)", color: "var(--bg-card)" }}
+            >
+              {t("createAccountBtn")}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setRegistering(false); setRegForm({ username: "", password: "", confirm: "" }); setRegError(""); }}
+              className="w-full mt-3 py-2 rounded-lg text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+            >
+              {t("alreadyHaveAccount")}
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  const faceBase = { background: "#e8e8e8", boxShadow: cardShadow, gridArea: "1 / 1", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" };
-
-  function startRegister() {
-    setRegistering(true);
-    setRegStep("username");
-    setUsernameAvailable(false);
-    setRegForm({ username: "", password: "", confirm: "" });
-    setRegError("");
-  }
-  function exitRegister() {
-    setRegistering(false);
-    setRegStep("username");
-    setRegForm({ username: "", password: "", confirm: "" });
-    setRegError("");
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#e8e8e8" }}>
-      <div className="w-full max-w-sm" style={{ perspective: "1400px" }}>
-        <div
-          style={{
-            display: "grid",
-            transformStyle: "preserve-3d",
-            transition: "transform 0.7s cubic-bezier(0.4, 0.1, 0.2, 1)",
-            transform: registering ? "rotateY(180deg)" : "rotateY(0deg)",
-          }}
-        >
-          {/* OLD TOMON — Kirish */}
-          <div className="rounded-[32px] p-8" style={faceBase}>
-            <h1 className="text-center text-3xl font-bold mb-1 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
-              {t("loginHeading")}
-            </h1>
-            <p className="text-center text-sm mb-7" style={{ color: "#9a9a9a" }}>
-              {t("loginSubtitle")}
-            </p>
+    <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="bg-[var(--bg-card)] rounded-[32px] shadow-xl p-8">
 
-            <div className="space-y-3.5">
-              <IconInput
-                icon={<UserIcon size={17} />}
-                value={loginForm.username}
-                onChange={(v) => setLoginForm({ ...loginForm, username: v })}
-                onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
-                placeholder={t("login")}
-                autoFocus={!registering}
-              />
-              <IconInput
-                icon={<Lock size={17} />}
-                type={showPassword ? "text" : "password"}
-                value={loginForm.password}
-                onChange={(v) => setLoginForm({ ...loginForm, password: v })}
-                onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
-                placeholder={t("password")}
-                showToggle
-                toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                onToggle={() => setShowPassword((v) => !v)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between mt-4 mb-1">
-              <div className="flex items-center gap-2.5">
-                <ToggleSwitch checked={rememberMe} onChange={setRememberMe} />
-                <span className="text-xs" style={{ color: "#929191" }}>{t("rememberMe")}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setForgotMode(true)}
-                className="text-xs font-medium transition-colors hover:opacity-80"
-                style={{ color: "#929191" }}
-              >
-                {t("forgotPassword")}
-              </button>
-            </div>
-
-            {loginError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{loginError}</p>}
-
+          {/* Rol tanlash: Ishchi | Boshqaruvchi */}
+          <div className="flex bg-[var(--bg-app)] border border-[var(--border-input)] rounded-full p-1 mb-7">
             <button
               type="button"
-              disabled={loginBusy}
-              onClick={() => onSubmit()}
-              onMouseEnter={() => setBtnHover(true)}
-              onMouseLeave={() => setBtnHover(false)}
-              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
-              style={{
-                background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
-                color: btnHover ? "#f5e9c8" : "#838383",
-                boxShadow: btnHover ? btnShadowHover : btnShadowRest,
-                transform: btnHover ? "translateY(-2px)" : "translateY(0)",
-              }}
+              onClick={() => { setAsAdmin(false); setLoginForm({ username: "", password: "" }); setShowForgotHint(false); }}
+              className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
+              style={!asAdmin ? { backgroundColor: accent, color: "#12161c" } : { color: "var(--text-secondary)" }}
             >
-              {loginBusy ? t("loading") : t("loginBtn")}
+              {t("roleTabEmployee")}
             </button>
+            <button
+              type="button"
+              onClick={() => { setAsAdmin(true); setLoginForm({ username: "", password: "" }); setShowForgotHint(false); }}
+              className="flex-1 py-2 rounded-full text-xs font-semibold transition-all duration-200"
+              style={asAdmin ? { backgroundColor: accent, color: "#12161c" } : { color: "var(--text-secondary)" }}
+            >
+              {t("roleTabAdmin")}
+            </button>
+          </div>
 
-            <p className="text-center text-xs mt-5" style={{ color: "#9a9a9a" }}>
+          <h1 className="text-center text-3xl font-extrabold text-[var(--text-primary)] mb-1 tracking-tight">
+            {t("loginHeading")}
+          </h1>
+          <p className="text-center text-[var(--text-muted)] text-sm mb-7">
+            {asAdmin ? t("adminLoginTitle") : t("employeeLoginTitle")}
+          </p>
+
+          <div className="space-y-3.5">
+            <IconInput
+              icon={<UserIcon size={17} />}
+              value={loginForm.username}
+              onChange={(v) => setLoginForm({ ...loginForm, username: v })}
+              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
+              placeholder={t("login")}
+              autoFocus
+            />
+            <IconInput
+              icon={<Lock size={17} />}
+              type={showPassword ? "text" : "password"}
+              value={loginForm.password}
+              onChange={(v) => setLoginForm({ ...loginForm, password: v })}
+              onKeyDown={(e) => { if (e.key === "Enter") onSubmit(asAdmin); }}
+              placeholder={t("password")}
+              showToggle
+              toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              onToggle={() => setShowPassword((v) => !v)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between mt-4 mb-1">
+            <div className="flex items-center gap-2">
+              <ToggleSwitch checked={rememberMe} onChange={setRememberMe} accent={accent} />
+              <span className="text-xs text-[var(--text-secondary)]">{t("rememberMe")}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForgotHint((v) => !v)}
+              className="text-xs font-semibold hover:opacity-80 transition-opacity"
+              style={{ color: accent }}
+            >
+              {t("forgotPassword")}
+            </button>
+          </div>
+          {showForgotHint && (
+            <p className="text-[11px] text-[var(--text-muted)] mt-2 leading-snug">{t("forgotPasswordHint")}</p>
+          )}
+
+          {loginError && <p className="text-[var(--bad)] text-xs mt-3 text-center">{loginError}</p>}
+
+          <button
+            type="button"
+            onClick={() => onSubmit(asAdmin)}
+            className="w-full mt-5 py-3.5 rounded-full text-sm font-bold uppercase tracking-widest transition-opacity hover:opacity-90 active:scale-[0.98]"
+            style={{ backgroundColor: "var(--text-primary)", color: "var(--bg-card)" }}
+          >
+            {t("loginBtn")}
+          </button>
+
+          {asAdmin && (
+            <p className="text-center text-xs text-[var(--text-muted)] mt-5">
               {t("noAccountYet")}{" "}
               <button
                 type="button"
-                onClick={startRegister}
-                className="font-semibold transition-opacity hover:opacity-80"
-                style={{ color: "#a10f0f" }}
+                onClick={() => { setRegistering(true); setLoginForm({ username: "", password: "" }); }}
+                className="font-semibold hover:opacity-80 transition-opacity"
+                style={{ color: "var(--bad)" }}
               >
                 {t("signUpLink")}
               </button>
             </p>
-          </div>
-
-          {/* ORQA TOMON — Ro'yxatdan o'tish (bosqichma-bosqich) */}
-          <div className="rounded-[32px] p-8" style={{ ...faceBase, transform: "rotateY(180deg)" }}>
-            {regStep === "username" ? (
-              <>
-                <div className="flex justify-center mb-5">
-                  <div
-                    className="w-16 h-16 rounded-[22px] flex items-center justify-center"
-                    style={{ background: "#e8e8e8", boxShadow: "-6px -6px 12px #f8f8f8, 6px 6px 14px #c3c3c3" }}
-                  >
-                    <ShieldCheck size={28} style={{ color: "#1a56b0" }} strokeWidth={2} />
-                  </div>
-                </div>
-                <h1 className="text-center text-2xl font-bold mb-1.5 tracking-tight leading-snug" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
-                  O'z jamoangizni<br />boshqarishni boshlang
-                </h1>
-                <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>{t("registerSubtitle")}</p>
-
-                <UsernameCheckField
-                  value={regForm.username}
-                  onChange={(v) => setRegForm({ ...regForm, username: v })}
-                  onStatusChange={setUsernameAvailable}
-                  active={registering && regStep === "username"}
-                />
-
-                <button
-                  type="button"
-                  disabled={!usernameAvailable}
-                  onClick={() => setRegStep("password")}
-                  className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-40 text-[#f5e9c8]"
-                  style={{ background: "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" }}
-                >
-                  Davom etish
-                </button>
-                <button
-                  type="button"
-                  onClick={exitRegister}
-                  className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
-                  style={{ color: "#9a9a9a" }}
-                >
-                  <ArrowLeft size={13} /> {t("alreadyHaveAccount")}
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="flex justify-center mb-5">
-                  <div
-                    className="w-16 h-16 rounded-[22px] flex items-center justify-center"
-                    style={{ background: "#e8e8e8", boxShadow: "-6px -6px 12px #f8f8f8, 6px 6px 14px #c3c3c3" }}
-                  >
-                    <Lock size={26} style={{ color: "#1a56b0" }} strokeWidth={2} />
-                  </div>
-                </div>
-                <h1 className="text-center text-2xl font-bold mb-1.5 tracking-tight" style={{ color: "#4a4a4a", textShadow: titleShadow }}>
-                  Parol o'ylab toping
-                </h1>
-                <p className="text-center text-sm mb-6" style={{ color: "#9a9a9a" }}>
-                  <b>{regForm.username}</b> uchun parol o'rnating
-                </p>
-
-                <div className="space-y-3.5">
-                  <IconInput
-                    icon={<Lock size={17} />}
-                    type={showRegPassword ? "text" : "password"}
-                    value={regForm.password}
-                    onChange={(v) => setRegForm({ ...regForm, password: v })}
-                    placeholder={t("choosePassword")}
-                    showToggle
-                    toggleIcon={showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    onToggle={() => setShowRegPassword((v) => !v)}
-                    autoFocus
-                  />
-                  <IconInput
-                    icon={<Lock size={17} />}
-                    type={showRegPassword ? "text" : "password"}
-                    value={regForm.confirm}
-                    onChange={(v) => setRegForm({ ...regForm, confirm: v })}
-                    placeholder={t("repeatNewPassword")}
-                  />
-                </div>
-                {regError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{regError}</p>}
-                <button
-                  type="button"
-                  disabled={regBusy}
-                  onClick={submitRegister}
-                  onMouseEnter={() => setBtnHover(true)}
-                  onMouseLeave={() => setBtnHover(false)}
-                  className="w-full mt-5 py-3.5 rounded-2xl text-sm font-semibold uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-60"
-                  style={{
-                    background: btnHover ? "linear-gradient(155deg, #1a56b0 0%, #123b7a 100%)" : "#e8e8e8",
-                    color: btnHover ? "#f5e9c8" : "#838383",
-                    boxShadow: btnHover ? btnShadowHover : btnShadowRest,
-                    transform: btnHover ? "translateY(-2px)" : "translateY(0)",
-                  }}
-                >
-                  {regBusy ? t("loading") : t("createAccountBtn")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRegStep("username")}
-                  className="w-full mt-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
-                  style={{ color: "#9a9a9a" }}
-                >
-                  <ArrowLeft size={13} /> Ortga
-                </button>
-              </>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -1020,7 +703,7 @@ function CopyButton({ text }) {
     <button
       type="button"
       onClick={doCopy}
-      className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[11px] transition-colors shrink-0"
+      className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#3a4552] text-[11px] transition-colors shrink-0"
     >
       {copied ? <Check size={12} className="text-[var(--good)]" /> : <Copy size={12} />}
       {copied ? t("copied") : t("copy")}
@@ -1054,32 +737,23 @@ function Lightbox({ src, name, onClose }) {
   );
 }
 
-function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword }) {
+function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage }) {
   const [open, setOpen] = useState(false);
+  const [reveal, setReveal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [editingWage, setEditingWage] = useState(false);
   const [wageDraft, setWageDraft] = useState(String(emp.dailyWage || ""));
-  const [resetOpen, setResetOpen] = useState(false);
-  const [resetPw, setResetPw] = useState("");
-  const [resetMsg, setResetMsg] = useState("");
   const { accent, t } = useApp();
 
-  async function saveWage() {
+  function saveWage() {
     const n = Number(wageDraft);
-    if (wageDraft && n >= 0) await onUpdateWage(n);
+    if (wageDraft && n >= 0) onUpdateWage(n);
     setEditingWage(false);
   }
 
-  async function submitReset() {
-    if (!resetPw || resetPw.length < 6) { setResetMsg("Parol kamida 6 belgidan iborat bo'lsin"); return; }
-    const result = await onResetPassword(resetPw);
-    if (result && result.error) setResetMsg(result.error);
-    else { setResetMsg("Yangi parol o'rnatildi!"); setResetPw(""); }
-  }
-
   return (
-    <div className="bg-[var(--bg-card)] neu-raised rounded-xl overflow-hidden">
+    <div className="card overflow-hidden">
       {showPhoto && <Lightbox src={emp.avatar} name={emp.name} onClose={() => setShowPhoto(false)} />}
       <div className="p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -1127,7 +801,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
             <KeyRound size={12} /> {t("credentialsHeader")}
           </div>
 
-          <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] neu-inset rounded-lg px-3 py-2">
+          <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg px-3 py-2">
             <div className="min-w-0">
               <div className="text-[10px] text-[var(--text-muted)]">{t("login")}</div>
               <div className="text-[var(--text-primary)] text-sm truncate">{emp.username}</div>
@@ -1135,34 +809,11 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
             <CopyButton text={emp.username} />
           </div>
 
-          {!resetOpen ? (
-            <button
-              type="button"
-              onClick={() => { setResetOpen(true); setResetMsg(""); }}
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
-            >
-              <KeyRound size={13} /> Parolni tiklash
-            </button>
-          ) : (
-            <div className="bg-[var(--bg-app)] neu-inset rounded-lg p-3 space-y-2">
-              <Field label="Yangi parol" type="password" value={resetPw} onChange={setResetPw} />
-              {resetMsg && <p className="text-[var(--text-secondary)] text-xs">{resetMsg}</p>}
-              <div className="flex gap-2">
-                <button type="button" onClick={submitReset} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
-                  {t("save")}
-                </button>
-                <button type="button" onClick={() => { setResetOpen(false); setResetPw(""); }} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
-                  {t("cancel")}
-                </button>
-              </div>
-            </div>
-          )}
-
           <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1 mt-1">
             <Wallet size={12} /> {t("dailyWage")}
           </div>
           {!editingWage ? (
-            <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] neu-inset rounded-lg px-3 py-2">
+            <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg px-3 py-2">
               <div className="text-[var(--text-primary)] text-sm font-mono tabular-nums">{fmt(emp.dailyWage)}{t("perDay")}</div>
               <button
                 type="button"
@@ -1174,13 +825,13 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
               </button>
             </div>
           ) : (
-            <div className="bg-[var(--bg-app)] neu-inset rounded-lg p-3 space-y-2">
+            <div className="bg-[var(--bg-app)] border border-[var(--border-input)] rounded-lg p-3 space-y-2">
               <MoneyField label={t("newDailyWage")} value={wageDraft} onChange={setWageDraft} suffix="so'm" />
               <div className="flex gap-2">
                 <button type="button" onClick={saveWage} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
                   {t("save")}
                 </button>
-                <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg bg-transparent border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
                   {t("cancel")}
                 </button>
               </div>
@@ -1223,7 +874,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
                 <button type="button" onClick={onDelete} className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity">
                   {t("yesDelete")}
                 </button>
-                <button type="button" onClick={() => setConfirmDelete(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => setConfirmDelete(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
                   {t("cancel")}
                 </button>
               </div>
@@ -1256,7 +907,7 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] neu-raised z-40 overflow-y-auto transition-transform duration-200 ${
+        className={`fixed top-0 right-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] border-l border-[var(--border)] shadow-2xl z-40 overflow-y-auto transition-transform duration-200 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -1288,7 +939,7 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className="bg-[var(--bg-card)] neu-raised rounded-xl p-3.5"
+              className="card p-3.5"
               style={!n.is_read ? { borderColor: "var(--accent)" } : undefined}
             >
               <div className="flex items-center justify-between gap-2 mb-1">
@@ -1309,19 +960,9 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
 
 function ProfileDrawer({
   open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
-  changeOwnCredentials, updateAvatar, enableNotifications, linkTelegram,
+  changeOwnCredentials, updateAvatar, enableNotifications,
   accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
-  const [tgBusy, setTgBusy] = useState(false);
-  const [tgMsg, setTgMsg] = useState("");
-  async function handleLinkTelegram() {
-    setTgBusy(true);
-    setTgMsg("");
-    const result = await linkTelegram();
-    setTgBusy(false);
-    if (result && result.error) setTgMsg(result.error);
-    else setTgMsg("Telegram ochildi — u yerda \"Start\" tugmasini bosing.");
-  }
   const { t } = useApp();
   const fileRef = useRef(null);
   const [page, setPage] = useState(null);
@@ -1331,11 +972,12 @@ function ProfileDrawer({
   const [newPw2, setNewPw2] = useState("");
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [avatarBusy, setAvatarBusy] = useState(false);
-  const [saveBusy, setSaveBusy] = useState(false);
   const [confirmDeleteAcc, setConfirmDeleteAcc] = useState(false);
+  // FIX: yangi qo'shildi — avval akkauntni o'chirish tugmasi hech qanday parol
+  // so'ramasdan ishlar edi. Umumiy kompyuterda seans ochiq qolgan bo'lsa,
+  // boshqa kishi ikkita tugma bosib akkauntni butunlay o'chirib yuborishi mumkin edi.
   const [deletePwInput, setDeletePwInput] = useState("");
   const [deletePwError, setDeletePwError] = useState("");
-  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     if (!open) setPage(null);
@@ -1366,24 +1008,25 @@ function ProfileDrawer({
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  async function submitPassword() {
+  function submitPassword() {
     setMsg({ type: "", text: "" });
+    if (currentPw !== me.password) {
+      setMsg({ type: "error", text: t("errWrongCurrentPassword") });
+      return;
+    }
     if (!newUsername.trim()) {
       setMsg({ type: "error", text: t("errEmptyLogin") });
       return;
     }
-    const wantsPasswordChange = !!newPw || !!newPw2;
-    if (wantsPasswordChange && (!newPw || newPw.length < 6)) {
-      setMsg({ type: "error", text: "Yangi parol kamida 6 belgidan iborat bo'lsin" });
+    if (!newPw || newPw.length < 4) {
+      setMsg({ type: "error", text: t("errShortPassword") });
       return;
     }
-    if (wantsPasswordChange && newPw !== newPw2) {
+    if (newPw !== newPw2) {
       setMsg({ type: "error", text: t("errPasswordMismatch") });
       return;
     }
-    setSaveBusy(true);
-    const result = await changeOwnCredentials(newUsername.trim(), wantsPasswordChange ? newPw : null, currentPw);
-    setSaveBusy(false);
+    const result = changeOwnCredentials(newUsername.trim(), newPw);
     if (result && result.error) {
       setMsg({ type: "error", text: result.error });
       return;
@@ -1400,7 +1043,7 @@ function ProfileDrawer({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
       )}
       <div
-        className={`fixed top-0 left-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] neu-raised z-40 overflow-y-auto transition-transform duration-200 ${
+        className={`fixed top-0 left-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] border-r border-[var(--border)] shadow-2xl z-40 overflow-y-auto transition-transform duration-200 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -1537,8 +1180,6 @@ function ProfileDrawer({
         {page === "privacy" && (
           <div className="px-5">
             <MenuRow icon={<KeyRound size={18} className="text-[var(--accent)]" />} label={t("updateCredentials")} onClick={() => setPage("credentials")} />
-            <MenuRow icon={<Send size={18} className="text-[#2aa9de]" />} label={tgBusy ? t("loading") : "Telegramga ulash (parolni tiklash uchun)"} onClick={handleLinkTelegram} />
-            {tgMsg && <p className="text-[var(--text-secondary)] text-xs pb-3 -mt-1">{tgMsg}</p>}
             {isAdmin && (
               <MenuRow icon={<Send size={18} className="text-[var(--good)]" />} label={t("enableNotifications")} onClick={enableNotifications} />
             )}
@@ -1550,7 +1191,7 @@ function ProfileDrawer({
             <div className="space-y-3">
               <Field label={t("currentPassword")} type="password" value={currentPw} onChange={setCurrentPw} />
               <Field label={t("newLogin")} value={newUsername} onChange={setNewUsername} />
-              <Field label={t("newPassword") + " (ixtiyoriy)"} type="password" value={newPw} onChange={setNewPw} />
+              <Field label={t("newPassword")} type="password" value={newPw} onChange={setNewPw} />
               <Field label={t("repeatNewPassword")} type="password" value={newPw2} onChange={setNewPw2} />
             </div>
             {msg.text && (
@@ -1558,12 +1199,11 @@ function ProfileDrawer({
             )}
             <button
               type="button"
-              disabled={saveBusy}
               onClick={submitPassword}
-              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
               style={{ backgroundColor: accent }}
             >
-              {saveBusy ? t("loading") : t("save")}
+              {t("save")}
             </button>
           </div>
         )}
@@ -1606,6 +1246,7 @@ function ProfileDrawer({
                 <p className="text-[var(--bad)] text-xs mb-2.5">
                   {isAdmin ? t("confirmDeleteAccountAdmin") : t("confirmDeleteAccountEmployee")}
                 </p>
+                {/* FIX: yangi qo'shildi — o'chirishdan oldin joriy parol tasdiqlanadi */}
                 <div className="mb-2.5">
                   <Field label={t("currentPassword")} type="password" value={deletePwInput} onChange={setDeletePwInput} />
                   {deletePwError && <p className="text-[var(--bad)] text-xs mt-1.5">{deletePwError}</p>}
@@ -1613,23 +1254,21 @@ function ProfileDrawer({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={deleteBusy}
-                    onClick={async () => {
-                      setDeleteBusy(true);
-                      const result = await onDeleteAccount(deletePwInput);
-                      setDeleteBusy(false);
-                      if (result && result.error) {
-                        setDeletePwError(result.error);
+                    onClick={() => {
+                      if (deletePwInput !== me.password) {
+                        setDeletePwError(t("errWrongCurrentPassword"));
+                        return;
                       }
+                      onDeleteAccount();
                     }}
-                    className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+                    className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
                   >
-                    {deleteBusy ? t("loading") : t("yesDeleteAccount")}
+                    {t("yesDeleteAccount")}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setConfirmDeleteAcc(false); setDeletePwInput(""); setDeletePwError(""); }}
-                    className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+                    className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
                   >
                     {t("cancel")}
                   </button>
@@ -1646,20 +1285,19 @@ function ProfileDrawer({
 function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
-  newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage, resetEmployeePassword,
+  newEmp, setNewEmp, empError, addEmployee, deleteEmployee, updateEmployeeWage,
   attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
-  notifications, markAllNotificationsRead, linkTelegram,
+  notifications, markAllNotificationsRead,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [addBusy, setAddBusy] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const { t } = useApp();
-  const myAdmin = usersData.admins[currentUser.username] || { avatar: null };
+  const myAdmin = usersData.admins[currentUser.username] || { password: "", avatar: null };
   const myEmployees = usersData.employees.filter((e) => e.owner === currentUser.username);
   const tabs = [
     { id: "employees", label: t("navEmployees"), icon: <Users size={18} /> },
@@ -1715,13 +1353,14 @@ function AdminApp({
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
+      // FIX: toISOString() UTC beradi — mahalliy sana bilan bir kunlik farq bo'lishi mumkin edi.
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     });
   })();
 
   const bottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
-      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md neu-raised rounded-full px-1.5 py-1">
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
         {tabs.map((tab) => {
           const active = adminTab === tab.id;
           return (
@@ -1750,7 +1389,7 @@ function AdminApp({
       <ProfileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        me={{ name: currentUser.username, username: currentUser.username, avatar: myAdmin.avatar }}
+        me={{ name: currentUser.username, username: currentUser.username, password: myAdmin.password, avatar: myAdmin.avatar }}
         roleLabel={t("adminPanel")}
         isAdmin={true}
         onDeleteAccount={deleteOwnAccount}
@@ -1762,13 +1401,12 @@ function AdminApp({
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
         enableNotifications={enableNotifications}
-        linkTelegram={linkTelegram}
       />
       <NotificationPanel
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
         notifications={notifications}
-        onMarkAllRead={() => markAllNotificationsRead()}
+        onMarkAllRead={() => markAllNotificationsRead(currentUser.username)}
       />
       <Shell
         title={t("adminPanel")}
@@ -1804,12 +1442,12 @@ function AdminApp({
               <UserPlus size={16} /> {t("addEmployeeHeader")}
             </button>
           ) : (
-            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
+            <div className="card p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                   <UserPlus size={15} /> {t("addEmployeeHeader")}
                 </div>
-                <button type="button" onClick={() => { setShowAddForm(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => { setShowAddForm(false); setEmpError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                   <X size={16} />
                 </button>
               </div>
@@ -1822,12 +1460,11 @@ function AdminApp({
               {empError && <p className="text-[var(--bad)] text-xs mt-3">{empError}</p>}
               <button
                 type="button"
-                disabled={addBusy}
-                onClick={async () => { setAddBusy(true); const ok = await addEmployee(); setAddBusy(false); if (ok) setShowAddForm(false); }}
-                className="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+                onClick={async () => { await addEmployee(); setShowAddForm(false); }}
+                className="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: accent }}
               >
-                <Plus size={14} /> {addBusy ? t("loading") : t("add")}
+                <Plus size={14} /> {t("add")}
               </button>
             </div>
           )}
@@ -1840,7 +1477,7 @@ function AdminApp({
                 value={empSearch}
                 onChange={(e) => setEmpSearch(e.target.value)}
                 placeholder="Ism bo'yicha qidirish..."
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
               />
             </div>
           )}
@@ -1857,14 +1494,7 @@ function AdminApp({
                 return <p className="text-[var(--text-muted)] text-sm text-center py-8">Hech kim topilmadi</p>;
               }
               return filteredEmployees.map((emp) => (
-                <EmployeeRow
-                  key={emp.id}
-                  emp={emp}
-                  summary={summaryFor(emp.id)}
-                  onDelete={() => deleteEmployee(emp.id)}
-                  onUpdateWage={(w) => updateEmployeeWage(emp.id, w)}
-                  onResetPassword={(pw) => resetEmployeePassword(emp.id, pw)}
-                />
+                <EmployeeRow key={emp.id} emp={emp} summary={summaryFor(emp.id)} onDelete={() => deleteEmployee(emp.id)} onUpdateWage={(w) => updateEmployeeWage(emp.id, w)} />
               ));
             })()}
           </div>
@@ -1873,7 +1503,7 @@ function AdminApp({
 
       {adminTab === "attendance" && (
         <div className="space-y-4">
-          <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4">
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                 <Calendar size={15} /> {t("markAttendanceHeader")}
@@ -1883,7 +1513,7 @@ function AdminApp({
               <button
                 type="button"
                 onClick={() => setWeekOffset((w) => w - 1)}
-                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset transition-colors"
+                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] transition-colors"
                 aria-label="prev week"
               >
                 <ChevronLeft size={16} />
@@ -1937,7 +1567,7 @@ function AdminApp({
               <button
                 type="button"
                 onClick={() => setWeekOffset((w) => w + 1)}
-                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset transition-colors"
+                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] transition-colors"
                 aria-label="next week"
               >
                 <ChevronRight size={16} />
@@ -1998,7 +1628,7 @@ function AdminApp({
                     <button
                       type="button"
                       onClick={() => setPendingBulk(null)}
-                      className="px-3 py-1.5 rounded-md bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-[11px] font-medium"
+                      className="px-3 py-1.5 rounded-md bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-secondary)] text-[11px] font-medium"
                     >
                       {t("cancel")}
                     </button>
@@ -2013,13 +1643,14 @@ function AdminApp({
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
             )}
             {visibleEmployees.length > 0 && attDate > todayISO() && (
-              <p className="text-[var(--warn)] text-xs text-center py-2 bg-[var(--bg-card)] neu-raised rounded-lg">{t("futureDateWarning")}</p>
+              <p className="text-[var(--warn)] text-xs text-center py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">{t("futureDateWarning")}</p>
             )}
             {visibleEmployees.map((emp) => {
               const hasEntry = attendance[emp.id]?.[attDate] !== undefined;
               const st = hasEntry ? attEntryStatus(attendance[emp.id]?.[attDate]) : null;
               const isFuture = attDate > todayISO();
 
+              // Bosilganda holat aylanadi: bo'sh -> to'liq -> yarim -> kelmadi -> bo'sh
               function cycleStatus() {
                 if (isFuture) return;
                 if (st === null) markAttendance(emp.id, 1);
@@ -2042,7 +1673,7 @@ function AdminApp({
                   type="button"
                   disabled={isFuture}
                   onClick={cycleStatus}
-                  className="w-full bg-[var(--bg-card)] neu-raised rounded-xl p-3.5 flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
+                  className="w-full card p-3.5 flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed text-left"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Avatar src={emp.avatar} name={emp.name} size={32} />
@@ -2069,7 +1700,7 @@ function AdminApp({
 
       {adminTab === "advances" && (
         <div className="space-y-5">
-          <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
+          <div className="card p-5">
             <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold mb-4">
               <Wallet size={15} /> {t("giveAdvanceHeader")}
             </div>
@@ -2095,7 +1726,7 @@ function AdminApp({
               <div className="col-span-2">
                 <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("employee")}</label>
                 <select value={advEmp} onChange={(e) => setAdvEmp(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)]">
+                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-input)] text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)]">
                   <option value="">{t("selectPlaceholder")}</option>
                   {myEmployees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
@@ -2112,7 +1743,7 @@ function AdminApp({
           </div>
 
           {advEmp && (
-            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
+            <div className="card p-5">
               <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("advanceHistory")}</div>
               {(advances[advEmp] || []).length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvances")}</p>}
               <div className="space-y-2">
@@ -2147,7 +1778,7 @@ function AdminApp({
               return sum + (r > 0 ? r : 0);
             }, 0);
             return (
-              <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-6 text-center">
+              <div className="card p-6 text-center">
                 <div className="text-[var(--text-muted)] text-xs mb-1.5">Jami to'lash kerak</div>
                 <div className={`text-3xl font-bold font-mono tabular-nums ${totalOwed > 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
                   {fmt(totalOwed)}
@@ -2155,7 +1786,7 @@ function AdminApp({
               </div>
             );
           })()}
-        <div className="bg-[var(--bg-card)] neu-raised rounded-xl overflow-hidden">
+        <div className="card overflow-hidden">
           <div className="p-5 pb-3 flex items-center justify-between gap-2">
             <div className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
               <ClipboardList size={15} /> {t("reportHeader")}
@@ -2228,7 +1859,7 @@ function AdminApp({
 
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, linkTelegram,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [empTab, setEmpTab] = useState("umumiy");
@@ -2290,7 +1921,7 @@ function EmployeeApp({
   ];
   const empBottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
-      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md neu-raised rounded-full px-1.5 py-1">
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] rounded-full shadow-lg px-1.5 py-1">
         {empTabs.map((tab) => {
           const active = empTab === tab.id;
           return (
@@ -2319,7 +1950,7 @@ function EmployeeApp({
       <ProfileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        me={{ name: s.emp.name, username: s.emp.username, avatar: s.emp.avatar }}
+        me={{ name: s.emp.name, username: s.emp.username, password: s.emp.password, avatar: s.emp.avatar }}
         roleLabel={t("employeePanel")}
         isAdmin={false}
         onDeleteAccount={deleteOwnAccount}
@@ -2330,7 +1961,6 @@ function EmployeeApp({
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
-        linkTelegram={linkTelegram}
       />
       <Shell
         title={t("employeePanel")}
@@ -2341,7 +1971,7 @@ function EmployeeApp({
       >
         {empTab === "umumiy" && (
           <div className="tab-transition space-y-3">
-            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-6 text-center">
+            <div className="card p-6 text-center">
               <div className="flex items-center justify-center gap-1.5 text-[var(--text-muted)] text-xs mb-1.5">
                 <Wallet size={13} /> {t("statRemainingSalary")}
               </div>
@@ -2381,13 +2011,13 @@ function EmployeeApp({
 
           return (
             <div className="tab-transition space-y-3">
-              <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4">
+              <div className="card p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <button type="button" onClick={() => setAttMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset">
+                  <button type="button" onClick={() => setAttMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)]">
                     <ChevronLeft size={15} />
                   </button>
                   <span className="text-[var(--text-primary)] text-sm font-semibold capitalize">{monthLabel}</span>
-                  <button type="button" onClick={() => setAttMonthOffset((o) => Math.min(0, o + 1))} disabled={attMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset disabled:opacity-30">
+                  <button type="button" onClick={() => setAttMonthOffset((o) => Math.min(0, o + 1))} disabled={attMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] border border-[var(--border-input)] disabled:opacity-30">
                     <ChevronRight size={15} />
                   </button>
                 </div>
@@ -2483,12 +2113,12 @@ function EmployeeApp({
               </div>
 
               {filteredAdv.length === 0 && (
-                <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-8 text-center">
+                <div className="card p-8 text-center">
                   <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
                 </div>
               )}
               {filteredAdv.slice().reverse().map((a) => (
-                <div key={a.id} className="bg-[var(--bg-card)] neu-raised rounded-xl p-2.5 flex items-center gap-2.5">
+                <div key={a.id} className="card p-2.5 flex items-center gap-2.5">
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                     style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
@@ -2528,23 +2158,35 @@ export default function WorkforceApp() {
 
 function WorkforceAppInner() {
   const [loading, setLoading] = useState(true);
+  const [initTimedOut, setInitTimedOut] = useState(false); // FIX: yangi holat — init() cho'zilib ketsa oq ekran o'rniga xabar ko'rsatish uchun
   const [usersData, setUsersData] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [advances, setAdvances] = useState({});
-  const [session, setSession] = useState(null);
-  const [currentUser, setCurrentUserState] = useState(null);
-  const [telegramPromptOpen, setTelegramPromptOpen] = useState(false);
-  const [telegramPromptPhase, setTelegramPromptPhase] = useState("prompt"); // prompt | waiting | success
-  const [telegramLinkBusy, setTelegramLinkBusy] = useState(false);
-  const telegramPollRef = useRef(null);
-
+  const [currentUser, setCurrentUserState] = useState(() => {
+    try {
+      const raw = localStorage.getItem("current-user");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   function setCurrentUser(user) {
     setCurrentUserState(user);
+    try {
+      if (user) localStorage.setItem("current-user", JSON.stringify(user));
+      else localStorage.removeItem("current-user");
+    } catch (e) {
+    }
   }
-
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
-  const [loginBusy, setLoginBusy] = useState(false);
+  // FIX: yangi qo'shildi — avval login urinishlariga hech qanday cheklov yo'q edi,
+  // shu sabab brute-force (parolni "sinab ko'rish") hujumidan himoya bo'lmagan.
+  // Bu FAQAT frontend darajasidagi yumshoq to'siq — asosiy himoya Supabase/backend
+  // tomonida (masalan Supabase Auth yoki rate-limit funksiyasi) bo'lishi kerak,
+  // buni Supabase qismini birga sozlayotganimizda ko'rib chiqamiz.
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(0);
 
   const [adminTab, setAdminTab] = useState("employees");
   const [newEmp, setNewEmp] = useState({ name: "", username: "", password: "", dailyWage: "" });
@@ -2564,98 +2206,49 @@ function WorkforceAppInner() {
   const [fontScale, setFontScale] = useState(100);
   const [lang, setLang] = useState("uz");
 
-  // ============================================================================
-  // MA'LUMOTLARNI YUKLASH — endi app_storage o'rniga real Supabase Auth +
-  // profiles/attendance/advances jadvallaridan o'qiladi (RLS himoyasi bilan).
-  // ============================================================================
-
-  async function loadAllData(sessionUser) {
-    // 1) O'z profilimni olamiz (rolimni aniqlash uchun)
-    const { data: myProfile, error: myErr } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", sessionUser.id)
-      .single();
-    if (myErr || !myProfile) {
-      await supabase.auth.signOut();
-      setCurrentUserState(null);
-      setLoading(false);
-      return;
-    }
-
-    if (myProfile.role === "admin") {
-      const { data: employeesRaw } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("owner_id", sessionUser.id);
-      const employees = (employeesRaw || []).map((e) => ({
-        id: e.id, name: e.display_name || e.username, username: e.username,
-        dailyWage: Number(e.daily_wage || 0), avatar: e.avatar_url,
-        owner: myProfile.username, wageHistory: e.wage_history || [],
-      }));
-      const empIds = employees.map((e) => e.id);
-
-      const attMap = {};
-      const advMap = {};
-      if (empIds.length > 0) {
-        const { data: attRows } = await supabase.from("attendance").select("*").in("employee_id", empIds);
-        (attRows || []).forEach((r) => {
-          if (!attMap[r.employee_id]) attMap[r.employee_id] = {};
-          attMap[r.employee_id][r.date] = { v: Number(r.status), wage: Number(r.wage_at_time) };
-        });
-        const { data: advRows } = await supabase.from("advances").select("*").in("employee_id", empIds).order("created_at", { ascending: true });
-        (advRows || []).forEach((r) => {
-          if (!advMap[r.employee_id]) advMap[r.employee_id] = [];
-          advMap[r.employee_id].push({ id: r.id, amount: Number(r.amount), date: r.date, note: r.note, type: r.type });
-        });
-      }
-
-      setUsersData({
-        admins: { [myProfile.username]: { avatar: myProfile.avatar_url } },
-        employees,
-      });
-      setAttendance(attMap);
-      setAdvances(advMap);
-      setCurrentUserState({ role: "admin", name: makeT(lang)("admin"), username: myProfile.username, id: myProfile.id });
-      await loadNotifications(myProfile.id);
-    } else {
-      // Ishchi: o'z ma'lumotlarini va admin (owner)ining avatarini olamiz
-      const { data: ownerProfile } = await supabase.from("profiles").select("username").eq("id", myProfile.owner_id).maybeSingle();
-      const emp = {
-        id: myProfile.id, name: myProfile.display_name || myProfile.username, username: myProfile.username,
-        dailyWage: Number(myProfile.daily_wage || 0), avatar: myProfile.avatar_url,
-        owner: ownerProfile?.username || "", wageHistory: myProfile.wage_history || [],
-      };
-      const { data: attRows } = await supabase.from("attendance").select("*").eq("employee_id", myProfile.id);
-      const attMap = {};
-      (attRows || []).forEach((r) => { attMap[r.date] = { v: Number(r.status), wage: Number(r.wage_at_time) }; });
-      const { data: advRows } = await supabase.from("advances").select("*").eq("employee_id", myProfile.id).order("created_at", { ascending: true });
-      const advList = (advRows || []).map((r) => ({ id: r.id, amount: Number(r.amount), date: r.date, note: r.note, type: r.type }));
-
-      setUsersData({ admins: {}, employees: [emp] });
-      setAttendance({ [myProfile.id]: attMap });
-      setAdvances({ [myProfile.id]: advList });
-      setCurrentUserState({ role: "employee", id: myProfile.id, name: emp.name, owner: emp.owner });
-    }
-    setLoading(false);
-  }
-
   useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      if (data.session) loadAllData(data.session.user);
-      else setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
-    return () => { mounted = false; sub.subscription.unsubscribe(); };
+    init();
+    // FIX: avvalgi versiyada 4 soniyadan keyin usersData hali null bo'lsa ham
+    // majburan loading=false qilib qo'yardi. Agar internet sekin bo'lsa yoki
+    // init() biror sababdan hali tugamagan bo'lsa, keyingi render'da
+    // usersData.admins[...] kabi joylarda "Cannot read properties of null"
+    // xatosi bilan butun ilova oq ekran bo'lib qolardi.
+    // Endi: agar shu muddatda usersData hali kelmagan bo'lsa, loading emas,
+    // initTimedOut holatiga o'tamiz — foydalanuvchiga aniq xabar va
+    // "qayta urinish" tugmasi ko'rsatiladi, ilova esa qulamaydi.
+    const timer = setTimeout(() => {
+      setInitTimedOut(true);
+    }, 8000);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem("app-mode", mode); } catch (e) {}
+    const channel = supabase
+      .channel("app_storage_live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_storage" },
+        (payload) => {
+          const row = payload.new;
+          if (!row || typeof row.value === "undefined") return;
+          try {
+            if (row.key === "users-data") setUsersData(JSON.parse(row.value));
+            else if (row.key === "attendance-data") setAttendance(JSON.parse(row.value));
+            else if (row.key === "advances-data") setAdvances(JSON.parse(row.value));
+          } catch (e) {
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("app-mode", mode);
+    } catch (e) {}
   }, [mode]);
 
   useEffect(() => {
@@ -2669,110 +2262,161 @@ function WorkforceAppInner() {
     };
   }, [fontScale]);
 
-  // FIX: avval bu yerda "attendance/advances/profiles" jadvallarini kuzatib
-  // turadigan realtime subscription bor edi, u har o'zgarishda BUTUN
-  // ma'lumotni qayta yuklardi. Muammo shu edi: har bir amal (masalan davomat
-  // belgilash) ham o'zi to'g'ridan-to'g'ri qayta yuklardi, HAM shu realtime
-  // signal orqali yana bir marta yuklanardi — ikkitasi bir vaqtda to'qnashib,
-  // tez-tez bosilganda ilova "qotib qolar" edi. Endi faqat aniq amaldan keyingi
-  // bitta yuklash yetarli, realtime esa olib tashlandi.
-
   useEffect(() => {
     if (!currentUser || currentUser.role !== "admin") return;
+    loadNotifications(currentUser.username);
+
     const channel = supabase
-      .channel(`notif_${currentUser.id}`)
+      .channel(`notif_${currentUser.username}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `admin_id=eq.${currentUser.id}` },
-        (payload) => setNotifications((prev) => [payload.new, ...prev])
+        { event: "INSERT", schema: "public", table: "notifications", filter: `admin_username=eq.${currentUser.username}` },
+        (payload) => {
+          setNotifications((prev) => [payload.new, ...prev]);
+        }
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [currentUser?.id]);
 
-  async function loadNotifications(adminId) {
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("admin_id", adminId)
-      .order("created_at", { ascending: false })
-      .limit(30);
-    setNotifications(data || []);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
+
+  async function init() {
+    setInitTimedOut(false); // FIX: qayta urinishda eski xato holatini tozalaymiz
+    let usersVal = null;
+    try {
+      const raw = await safeGet("users-data");
+      usersVal = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      usersVal = null;
+    }
+    if (!usersVal) {
+      usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: [] };
+      await safeSet("users-data", JSON.stringify(usersVal));
+    } else if (usersVal.admin && !usersVal.admins) {
+      const owner = usersVal.admin.username;
+      usersVal = {
+        admins: { [owner]: { password: usersVal.admin.password, avatar: usersVal.admin.avatar || null } },
+        employees: (usersVal.employees || []).map((e) => ({ ...e, owner })),
+      };
+      await safeSet("users-data", JSON.stringify(usersVal));
+    } else if (!usersVal.admins) {
+      usersVal = { admins: { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password, avatar: null } }, employees: usersVal.employees || [] };
+      await safeSet("users-data", JSON.stringify(usersVal));
+    }
+    setUsersData(usersVal);
+
+    setCurrentUserState((prevUser) => {
+      if (!prevUser) return prevUser;
+      const stillValid = prevUser.role === "admin"
+        ? !!usersVal.admins[prevUser.username]
+        : (usersVal.employees || []).some((e) => e.id === prevUser.id);
+      if (!stillValid) {
+        try { localStorage.removeItem("current-user"); } catch (e) {}
+        return null;
+      }
+      return prevUser;
+    });
+
+    try {
+      const rawAtt = await safeGet("attendance-data");
+      setAttendance(rawAtt ? JSON.parse(rawAtt) : {});
+    } catch (e) {
+      setAttendance({});
+    }
+
+    try {
+      const rawAdv = await safeGet("advances-data");
+      setAdvances(rawAdv ? JSON.parse(rawAdv) : {});
+    } catch (e) {
+      setAdvances({});
+    }
+
+    setLoading(false);
   }
 
-  async function markAllNotificationsRead() {
-    if (!currentUser || currentUser.role !== "admin") return;
-    await supabase.from("notifications").update({ is_read: true }).eq("admin_id", currentUser.id).eq("is_read", false);
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  async function persistUsers(data) {
+    setUsersData(data);
+    await safeSet("users-data", JSON.stringify(data));
+  }
+  async function persistAttendance(data) {
+    setAttendance(data);
+    await safeSet("attendance-data", JSON.stringify(data));
+  }
+  async function persistAdvances(data) {
+    setAdvances(data);
+    await safeSet("advances-data", JSON.stringify(data));
   }
 
-  // ============================================================================
-  // LOGIN / RO'YXATDAN O'TISH
-  // ============================================================================
-
-  async function handleLogin() {
+  function handleLogin(asAdmin) {
     setLoginError("");
-    const username = loginForm.username.trim();
-    const password = loginForm.password;
-    if (!username || !password) {
-      setLoginError(makeT(lang)("wrongLogin"));
+    // FIX: agar oldingi urinishlar tufayli hozir bloklangan bo'lsak, urinishni to'xtatamiz.
+    if (Date.now() < lockedUntil) {
+      const secsLeft = Math.ceil((lockedUntil - Date.now()) / 1000);
+      setLoginError(
+        lang === "ru" ? `Слишком много попыток. Подождите ${secsLeft} сек.` :
+        lang === "en" ? `Too many attempts. Wait ${secsLeft}s.` :
+        `Juda ko'p urinish. ${secsLeft} soniya kuting.`
+      );
       return;
     }
-    setLoginBusy(true);
     try {
-      const { data: email, error: lookupErr } = await supabase.rpc("email_for_username", { p_username: username });
-      if (lookupErr || !email) {
-        setLoginError(makeT(lang)("wrongLogin"));
-        setLoginBusy(false);
-        return;
+      const username = loginForm.username.trim();
+      const password = loginForm.password;
+      const admins = (usersData && usersData.admins) ? usersData.admins : { [ADMIN_DEFAULT.username]: { password: ADMIN_DEFAULT.password } };
+      const employees = (usersData && usersData.employees) ? usersData.employees : [];
+
+      if (asAdmin) {
+        if (admins[username] && admins[username].password === password) {
+          setFailedAttempts(0); // FIX: muvaffaqiyatli kirishda hisoblagichni tozalaymiz
+          setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username });
+          return;
+        }
+      } else {
+        const emp = employees.find((x) => x.username === username && x.password === password);
+        if (emp) {
+          setFailedAttempts(0); // FIX: muvaffaqiyatli kirishda hisoblagichni tozalaymiz
+          setCurrentUser({ role: "employee", id: emp.id, name: emp.name, owner: emp.owner });
+          return;
+        }
       }
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInErr || !signInData?.session) {
-        setLoginError(makeT(lang)("wrongLogin"));
-        setLoginBusy(false);
-        return;
-      }
-      setSession(signInData.session);
-      await loadAllData(signInData.session.user);
+      // FIX: noto'g'ri urinishni hisoblaymiz — 5 marta ketma-ket xato bo'lsa,
+      // 30 soniyaga bloklaymiz (oddiy frontend darajasidagi cheklov).
+      setFailedAttempts((prev) => {
+        const next = prev + 1;
+        if (next >= 5) {
+          setLockedUntil(Date.now() + 30000);
+          return 0;
+        }
+        return next;
+      });
+      setLoginError(makeT(lang)("wrongLogin"));
     } catch (err) {
       setLoginError(String(err && err.message ? err.message : err));
     }
-    setLoginBusy(false);
   }
 
-  async function registerAdmin(newUsername, newPassword) {
-    try {
-      const { error } = await invokeFn("register-admin", { username: newUsername, password: newPassword });
-      if (error) {
-        return { error };
-      }
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: `${newUsername.toLowerCase()}@nazoratplus.internal`,
-        password: newPassword,
-      });
-      if (signInErr || !signInData?.session) {
-        return { error: "Ro'yxatdan o'tildi, lekin avtomatik kirishda xato. Iltimos, qo'lda kiring." };
-      }
-      setSession(signInData.session);
-      await loadAllData(signInData.session.user);
-      setTelegramPromptOpen(true);
-      return {};
-    } catch (err) {
-      return { error: String(err && err.message ? err.message : err) };
+  function registerAdmin(newUsername, newPassword) {
+    const admins = usersData.admins || {};
+    if (!newUsername || !newUsername.trim()) return { error: makeT(lang)("errEmptyLogin") };
+    const uname = newUsername.trim();
+    if (admins[uname] || usersData.employees.some((e) => e.username === uname)) {
+      return { error: makeT(lang)("errLoginTaken") };
     }
+    if (!newPassword || newPassword.length < 4) {
+      return { error: makeT(lang)("errShortPassword") };
+    }
+    const updated = { ...usersData, admins: { ...admins, [uname]: { password: newPassword, avatar: null } } };
+    persistUsers(updated);
+    setCurrentUser({ role: "admin", name: makeT(lang)("admin"), username: uname });
+    return {};
   }
 
   function logout() {
-    supabase.auth.signOut();
-    setCurrentUserState(null);
-    setUsersData(null);
-    setSession(null);
+    setCurrentUser(null);
     setLoginForm({ username: "", password: "" });
   }
-
-  // ============================================================================
-  // HISOB-KITOB (o'zgarmagan)
-  // ============================================================================
 
   function summaryFor(empId) {
     const emp = usersData.employees.find((x) => x.id === empId);
@@ -2792,228 +2436,165 @@ function WorkforceAppInner() {
     return { emp, workedDays, totalWage, totalAdvance, totalAvans, totalSalaryPaid, remaining: totalWage - totalAdvance, advList, att };
   }
 
-  // ============================================================================
-  // ISHCHILARNI BOSHQARISH — endi Edge Function + RPC orqali
-  // ============================================================================
-
   async function addEmployee() {
     setEmpError("");
     if (!newEmp.name || !newEmp.username || !newEmp.password || !newEmp.dailyWage) {
       setEmpError(makeT(lang)("fillAllFields"));
-      return false;
+      return;
     }
-    const { error } = await invokeFn("create-employee", {
-      name: newEmp.name, username: newEmp.username, password: newEmp.password, dailyWage: Number(newEmp.dailyWage),
-    });
-    if (error) {
-      setEmpError(error);
-      return false;
+    if (usersData.employees.some((x) => x.username === newEmp.username) || Object.keys(usersData.admins).includes(newEmp.username)) {
+      setEmpError(makeT(lang)("errLoginTaken"));
+      return;
     }
+    const id = "e" + Date.now();
+    const wage = Number(newEmp.dailyWage);
+    const updated = {
+      ...usersData,
+      employees: [...usersData.employees, {
+        id, name: newEmp.name, username: newEmp.username,
+        password: newEmp.password, dailyWage: wage, avatar: null,
+        owner: currentUser.username,
+        wageHistory: [{ date: todayISO(), wage }],
+      }],
+    };
+    await persistUsers(updated);
     setNewEmp({ name: "", username: "", password: "", dailyWage: "" });
-    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    await loadAllData(session.user);
-    return true;
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
   }
 
   async function deleteEmployee(id) {
-    const { error } = await invokeFn("delete-employee", { employeeId: id });
-    if (error) { console.error(error); return; }
+    const target = usersData.employees.find((x) => x.id === id);
+    if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
+    await persistUsers({ ...usersData, employees: usersData.employees.filter((x) => x.id !== id) });
+    const att2 = { ...attendance }; delete att2[id]; await persistAttendance(att2);
+    const adv2 = { ...advances }; delete adv2[id]; await persistAdvances(adv2);
     if (advEmp === id) setAdvEmp("");
-    await loadAllData(session.user);
   }
 
   async function updateEmployeeWage(id, newWage) {
-    const { error } = await supabase.rpc("admin_update_employee_wage", { p_employee_id: id, p_new_wage: newWage });
-    if (error) { console.error(error); return; }
-    await loadAllData(session.user);
+    const target = usersData.employees.find((x) => x.id === id);
+    if (!target || (currentUser && currentUser.role === "admin" && target.owner !== currentUser.username)) return;
+    const today = todayISO();
+    const history = Array.isArray(target.wageHistory) && target.wageHistory.length > 0
+      ? target.wageHistory
+      : [{ date: "2000-01-01", wage: target.dailyWage }];
+    const withoutToday = history.filter((h) => h.date !== today);
+    const newHistory = [...withoutToday, { date: today, wage: newWage }].sort((a, b) => (a.date < b.date ? -1 : 1));
+    const employees = usersData.employees.map((e) => (e.id === id ? { ...e, dailyWage: newWage, wageHistory: newHistory } : e));
+    await persistUsers({ ...usersData, employees });
   }
-
-  async function resetEmployeePassword(id, newPassword) {
-    const { error } = await invokeFn("reset-employee-password", { employeeId: id, newPassword });
-    if (error) return { error };
-    return {};
-  }
-
-  // ============================================================================
-  // DAVOMAT
-  // ============================================================================
 
   async function markAttendance(empId, status) {
     if (attDate > todayISO()) return;
-    const currentRaw = attendance[empId]?.[attDate];
-    const currentStatus = currentRaw !== undefined ? attEntryStatus(currentRaw) : null;
-    // FIX: avval har bosishda BUTUN ma'lumot serverdan qayta so'ralardi —
-    // tez-tez bosilganda so'rovlar to'planib, ilova "qotib qolardi". Endi
-    // ekrandagi holatni DARHOL (optimistik) yangilaymiz, DB yozuvi orqa fonda
-    // ketadi. Xato bo'lsa, eski holatga qaytariladi.
-    const prevAttendance = attendance;
-    if (currentStatus === status) {
-      setAttendance((prev) => {
-        const dayMap = { ...(prev[empId] || {}) };
-        delete dayMap[attDate];
-        return { ...prev, [empId]: dayMap };
-      });
-      const { error } = await supabase.from("attendance").delete().eq("employee_id", empId).eq("date", attDate);
-      if (error) setAttendance(prevAttendance);
+    const dayMap = { ...(attendance[empId] || {}) };
+    const currentStatus = attEntryStatus(dayMap[attDate]);
+    if (dayMap[attDate] !== undefined && currentStatus === status) {
+      delete dayMap[attDate];
     } else {
       const emp = usersData.employees.find((e) => e.id === empId);
-      const wage = Number(emp ? emp.dailyWage : 0);
-      setAttendance((prev) => ({
-        ...prev,
-        [empId]: { ...(prev[empId] || {}), [attDate]: { v: status, wage } },
-      }));
-      const { error } = await supabase.from("attendance").upsert(
-        { employee_id: empId, date: attDate, status, wage_at_time: wage },
-        { onConflict: "employee_id,date" }
-      );
-      if (error) setAttendance(prevAttendance);
+      dayMap[attDate] = { v: status, wage: Number(emp ? emp.dailyWage : 0) };
     }
+    await persistAttendance({ ...attendance, [empId]: dayMap });
   }
 
+  // Ommaviy belgilash: har bir ishchi uchun wage history'dan (o'sha kunga mos)
+  // stavkani oladi — hozirgi (joriy) stavka emas, shu tufayli stavka o'zgargan
+  // bo'lsa ham eski kunlar to'g'ri hisoblanadi.
   async function bulkMarkAttendance(empIds, status) {
     if (attDate > todayISO()) return;
-    const rows = empIds.map((id) => {
+    const updated = { ...attendance };
+    empIds.forEach((id) => {
       const emp = usersData.employees.find((e) => e.id === id);
       const wage = emp ? wageForDate(emp, attDate) : 0;
-      return { employee_id: id, date: attDate, status, wage_at_time: Number(wage || 0) };
+      const dayMap = { ...(updated[id] || {}) };
+      dayMap[attDate] = { v: status, wage: Number(wage || 0) };
+      updated[id] = dayMap;
     });
-    const prevAttendance = attendance;
-    setAttendance((prev) => {
-      const next = { ...prev };
-      rows.forEach((r) => {
-        next[r.employee_id] = { ...(next[r.employee_id] || {}), [r.date]: { v: r.status, wage: r.wage_at_time } };
-      });
-      return next;
-    });
-    const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "employee_id,date" });
-    if (error) setAttendance(prevAttendance);
+    await persistAttendance(updated);
   }
 
-  // ============================================================================
-  // AVANS / TO'LOV
-  // ============================================================================
-
   async function addAdvance() {
+    // FIX: avvalgi tekshiruv `!advForm.amount` edi — bu "0" satrini ham
+    // "bo'sh" deb hisoblamas edi (chunki "0" == false emas, lekin bo'sh
+    // satr ""ni tekshirish kifoya emas edi), shu sabab summasi 0 bo'lgan
+    // avans ham ro'yxatga qo'shilib ketishi mumkin edi. Endi aniq son va
+    // 0 dan katta ekanini tekshiramiz.
     const amountNum = Number(advForm.amount);
     if (!advEmp || !advForm.amount || !Number.isFinite(amountNum) || amountNum <= 0) return;
-    const { data, error } = await supabase.from("advances").insert({
-      employee_id: advEmp, amount: amountNum, date: advForm.date, note: advForm.note || null, type: advForm.type || "avans",
-    }).select().single();
+    const list = advances[advEmp] ? [...advances[advEmp]] : [];
+    list.push({ id: "a" + Date.now(), amount: amountNum, date: advForm.date, note: advForm.note, type: advForm.type || "avans" });
+    await persistAdvances({ ...advances, [advEmp]: list });
     setAdvForm({ amount: "", date: todayISO(), note: "", type: advForm.type || "avans" });
-    if (!error && data) {
-      setAdvances((prev) => ({
-        ...prev,
-        [advEmp]: [...(prev[advEmp] || []), { id: data.id, amount: Number(data.amount), date: data.date, note: data.note, type: data.type }],
-      }));
-    }
   }
 
   async function deleteAdvance(empId, advId) {
-    setAdvances((prev) => ({ ...prev, [empId]: (prev[empId] || []).filter((a) => a.id !== advId) }));
-    await supabase.from("advances").delete().eq("id", advId);
+    const list = (advances[empId] || []).filter((a) => a.id !== advId);
+    await persistAdvances({ ...advances, [empId]: list });
   }
 
-  // ============================================================================
-  // PROFIL / XAVFSIZLIK
-  // ============================================================================
-
-  async function verifyCurrentPassword(password) {
-    try {
-      const { data: userRes } = await supabase.auth.getUser();
-      const email = userRes?.user?.email;
-      if (!email) return false;
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return !error;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  async function changeOwnCredentials(newUsername, newPasswordOrNull, currentPassword) {
-    const ok = await verifyCurrentPassword(currentPassword);
-    if (!ok) return { error: makeT(lang)("errWrongCurrentPassword") };
-
-    if (newPasswordOrNull) {
-      const { error: pwErr } = await supabase.auth.updateUser({ password: newPasswordOrNull });
-      if (pwErr) return { error: pwErr.message };
-    }
+  function changeOwnCredentials(newUsername, newPassword) {
+    if (!currentUser) return { error: "—" };
     if (currentUser.role === "admin") {
-      const taken = usersData.employees.some((e) => e.username === newUsername) ;
-      // eslint-disable-next-line no-unused-vars
-    }
-    const { error: rpcErr } = await supabase.rpc("update_own_profile", { new_username: newUsername, new_avatar_url: null });
-    if (rpcErr) return { error: rpcErr.message.includes("duplicate") ? makeT(lang)("errLoginTaken") : rpcErr.message };
-
-    await loadAllData(session.user);
-    return {};
-  }
-
-  async function deleteOwnAccount(currentPassword) {
-    const ok = await verifyCurrentPassword(currentPassword);
-    if (!ok) return { error: makeT(lang)("errWrongCurrentPassword") };
-    const { error } = await invokeFn("delete-account");
-    if (error) return { error };
-    logout();
-    return {};
-  }
-
-  async function updateAvatar(dataUrl) {
-    const { error } = await supabase.rpc("update_own_profile", { new_username: null, new_avatar_url: dataUrl });
-    if (error) { console.error(error); return; }
-    await loadAllData(session.user);
-  }
-
-  // ============================================================================
-  // BILDIRISHNOMALAR (push)
-  // ============================================================================
-
-  async function linkTelegram() {
-    try {
-      const { data, error } = await invokeFn("telegram-link-start");
-      if (error) {
-        return { error };
-      }
-      window.open(data.linkUrl, "_blank");
-      startTelegramLinkPolling();
+      const oldUsername = currentUser.username;
+      const taken = newUsername !== oldUsername &&
+        (Object.keys(usersData.admins).includes(newUsername) || usersData.employees.some((e) => e.username === newUsername));
+      if (taken) return { error: makeT(lang)("errLoginTaken") };
+      const admins = { ...usersData.admins };
+      const data = admins[oldUsername];
+      delete admins[oldUsername];
+      admins[newUsername] = { ...data, password: newPassword };
+      const employees = usersData.employees.map((e) => (e.owner === oldUsername ? { ...e, owner: newUsername } : e));
+      persistUsers({ ...usersData, admins, employees });
+      setCurrentUser({ role: "admin", name: currentUser.name, username: newUsername });
       return {};
-    } catch (e) {
-      return { error: String(e?.message || e) };
     }
+    const taken = usersData.employees.some((e) => e.id !== currentUser.id && e.username === newUsername) || Object.keys(usersData.admins).includes(newUsername);
+    if (taken) return { error: makeT(lang)("errLoginTaken") };
+    const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, username: newUsername, password: newPassword } : e));
+    persistUsers({ ...usersData, employees });
+    setCurrentUser({ role: "employee", id: currentUser.id, name: currentUser.name, owner: currentUser.owner });
+    return {};
   }
 
-  // "Start" tugmasi Telegram tomonda bosilishini kuzatib boradi (har 2 soniyada
-  // profilni tekshiradi). Bosilgach — tick + "Xush kelibsiz" ko'rsatiladi.
-  function startTelegramLinkPolling() {
-    setTelegramPromptPhase("waiting");
-    let attempts = 0;
-    if (telegramPollRef.current) clearInterval(telegramPollRef.current);
-    telegramPollRef.current = setInterval(async () => {
-      attempts++;
-      try {
-        const { data: userRes } = await supabase.auth.getUser();
-        const uid = userRes?.user?.id;
-        if (uid) {
-          const { data: prof } = await supabase.from("profiles").select("telegram_chat_id").eq("id", uid).maybeSingle();
-          if (prof?.telegram_chat_id) {
-            clearInterval(telegramPollRef.current);
-            telegramPollRef.current = null;
-            setTelegramPromptPhase("success");
-            setTimeout(() => { setTelegramPromptOpen(false); setTelegramPromptPhase("prompt"); }, 1800);
-            return;
-          }
-        }
-      } catch (e) {}
-      if (attempts >= 60) { // ~2 daqiqa
-        clearInterval(telegramPollRef.current);
-        telegramPollRef.current = null;
-        setTelegramPromptPhase("prompt");
-      }
-    }, 2000);
+  async function deleteOwnAccount() {
+    if (!currentUser) return;
+    if (currentUser.role === "admin") {
+      const admins = { ...usersData.admins };
+      delete admins[currentUser.username];
+      const ownedIds = usersData.employees.filter((e) => e.owner === currentUser.username).map((e) => e.id);
+      const employees = usersData.employees.filter((e) => e.owner !== currentUser.username);
+      await persistUsers({ ...usersData, admins, employees });
+      const att2 = { ...attendance }; ownedIds.forEach((id) => delete att2[id]); await persistAttendance(att2);
+      const adv2 = { ...advances }; ownedIds.forEach((id) => delete adv2[id]); await persistAdvances(adv2);
+    } else {
+      const employees = usersData.employees.filter((e) => e.id !== currentUser.id);
+      await persistUsers({ ...usersData, employees });
+      const att2 = { ...attendance }; delete att2[currentUser.id]; await persistAttendance(att2);
+      const adv2 = { ...advances }; delete adv2[currentUser.id]; await persistAdvances(adv2);
+    }
+    logout();
   }
 
-  useEffect(() => {
-    return () => { if (telegramPollRef.current) clearInterval(telegramPollRef.current); };
-  }, []);
+  async function loadNotifications(adminUsername) {
+    if (!adminUsername) return;
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("admin_username", adminUsername)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    setNotifications(data || []);
+  }
+
+  async function markAllNotificationsRead(adminUsername) {
+    if (!adminUsername) return;
+    await supabase.from("notifications").update({ is_read: true }).eq("admin_username", adminUsername).eq("is_read", false);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  }
 
   async function enableNotifications() {
     if (!currentUser || currentUser.role !== "admin") return;
@@ -3032,9 +2613,18 @@ function WorkforceAppInner() {
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
       }
+      // FIX: avval har safar "enableNotifications" bosilganda `insert` qilinar edi —
+      // shu sabab bitta foydalanuvchi uchun bir nechta takroriy obuna yig'ilib qolardi.
+      // Endi endpoint bo'yicha upsert qilinadi (Supabase tomonda push_subscriptions
+      // jadvalida subscription->>'endpoint' ustuniga unique index/constraint kerak bo'ladi —
+      // buni Supabase qismini birga qilayotganimizda sozlaymiz).
       const subJson = sub.toJSON();
       await supabase.from("push_subscriptions").upsert(
-        { admin_id: currentUser.id, subscription: subJson, endpoint: subJson.endpoint },
+        {
+          admin_username: currentUser.username,
+          subscription: subJson,
+          endpoint: subJson.endpoint,
+        },
         { onConflict: "endpoint" }
       );
       alert("Bildirishnoma yoqildi!");
@@ -3043,10 +2633,49 @@ function WorkforceAppInner() {
     }
   }
 
+  async function updateAvatar(dataUrl) {
+    if (!currentUser) return;
+    if (currentUser.role === "admin") {
+      const admins = { ...usersData.admins, [currentUser.username]: { ...usersData.admins[currentUser.username], avatar: dataUrl } };
+      await persistUsers({ ...usersData, admins });
+    } else {
+      const employees = usersData.employees.map((e) => (e.id === currentUser.id ? { ...e, avatar: dataUrl } : e));
+      await persistUsers({ ...usersData, employees });
+    }
+  }
+
   const t = makeT(lang);
 
   let screen;
-  if (loading) {
+  // FIX: usersData hali null bo'lsa (masalan tarmoq sekin bo'lgani uchun init()
+  // hali tugamagan), currentUser mavjud bo'lsa ham AdminApp/EmployeeApp'ni
+  // render qilmaymiz — aks holda usersData.admins[...] kabi joylarda
+  // "Cannot read properties of null" xatosi bilan ilova qulab tushardi.
+  if (!usersData && initTimedOut) {
+    // FIX: yangi holat — internet/serverga ulanib bo'lmadi, foydalanuvchiga
+    // aniq xabar va qayta urinish imkoni beriladi (oq ekran o'rniga).
+    screen = (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-app)] px-6 text-center">
+        <img src="/logo.svg" alt={t("appName")} className="w-14 h-14 opacity-60" />
+        <div className="text-[var(--text-primary)] font-semibold text-base">
+          {lang === "ru" ? "Не удалось загрузить данные" : lang === "en" ? "Failed to load data" : "Ma'lumotlarni yuklab bo'lmadi"}
+        </div>
+        <div className="text-[var(--text-muted)] text-xs max-w-xs">
+          {lang === "ru" ? "Проверьте подключение к интернету и попробуйте снова." : lang === "en" ? "Check your internet connection and try again." : "Internet aloqasini tekshirib, qayta urinib ko'ring."}
+        </div>
+        <button
+          type="button"
+          onClick={() => { setLoading(true); setInitTimedOut(false); init(); }}
+          className="mt-2 px-5 py-2.5 rounded-lg text-[#12161c] text-sm font-semibold hover:opacity-90 transition-opacity"
+          style={{ backgroundColor: accent }}
+        >
+          {lang === "ru" ? "Повторить" : lang === "en" ? "Retry" : "Qayta urinish"}
+        </button>
+      </div>
+    );
+  } else if (loading || !usersData) {
+    // FIX: hali usersData tayyor bo'lmagan bo'lsa (init() davom etyapti),
+    // currentUser mavjud bo'lsa ham Admin/EmployeeApp render qilinmaydi.
     screen = (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-app)]">
         <img src="/logo.svg" alt={t("appName")} className="w-16 h-16 animate-pulse" />
@@ -3054,13 +2683,12 @@ function WorkforceAppInner() {
         <div className="text-[var(--text-muted)] text-xs">{t("loading")}</div>
       </div>
     );
-  } else if (!currentUser || !usersData) {
+  } else if (!currentUser) {
     screen = (
       <LoginScreen
         loginForm={loginForm}
         setLoginForm={setLoginForm}
         loginError={loginError}
-        loginBusy={loginBusy}
         onSubmit={handleLogin}
         onRegister={registerAdmin}
       />
@@ -3080,7 +2708,6 @@ function WorkforceAppInner() {
         addEmployee={addEmployee}
         deleteEmployee={deleteEmployee}
         updateEmployeeWage={updateEmployeeWage}
-        resetEmployeePassword={resetEmployeePassword}
         attendance={attendance}
         attDate={attDate}
         setAttDate={setAttDate}
@@ -3103,7 +2730,6 @@ function WorkforceAppInner() {
         enableNotifications={enableNotifications}
         notifications={notifications}
         markAllNotificationsRead={markAllNotificationsRead}
-        linkTelegram={linkTelegram}
       />
     );
   } else {
@@ -3120,7 +2746,6 @@ function WorkforceAppInner() {
         mode={mode} setMode={setMode}
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
-        linkTelegram={linkTelegram}
       />
     );
   }
@@ -3128,7 +2753,7 @@ function WorkforceAppInner() {
   return (
     <AppContext.Provider value={{ accent, lang, t }}>
       <div
-        className="font-sans"
+        className={`font-sans ${mode === "dark" ? "dark-mode" : "light-mode"}`}
         style={{
           ...PALETTES[mode],
           "--accent": accent,
@@ -3150,23 +2775,43 @@ function WorkforceAppInner() {
           }
           .tab-transition { animation: fadeSlideIn 0.28s ease-out; }
 
-          /* YANGI: butun ilova bo'ylab yumshoq (neumorphic) uslub — login
-             ekranidagi kabi. Barcha "kartochka"lar bir xil fonga ega bo'lib,
-             faqat yorug'/qorong'i soyalar orqali "ko'tarilgan" yoki
-             "botiq" ko'rinishga ega bo'ladi. */
-          .neu-raised {
-            box-shadow: -7px -7px 14px var(--shadow-hi), 7px 7px 14px var(--shadow-lo);
-            transition: box-shadow 0.2s ease, transform 0.2s ease;
+          /* ===== KARTOCHKA (Card) — butun ilova bo'ylab yagona ko'rinish ===== */
+          .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow:
+              0 1px 2px rgba(0, 0, 0, 0.04),
+              0 2px 8px -2px rgba(0, 0, 0, 0.06);
+            transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
           }
-          .neu-inset {
-            box-shadow: inset -4px -4px 8px var(--shadow-hi), inset 4px 4px 8px var(--shadow-lo);
+
+          /* Bosiladigan kartochkalar (tugma bo'lganlari) — sezilarli javob beradi */
+          button.card:hover:not(:disabled) {
+            border-color: var(--border-input);
+            box-shadow:
+              0 2px 4px rgba(0, 0, 0, 0.05),
+              0 8px 20px -6px rgba(0, 0, 0, 0.12);
           }
-          button.neu-raised:active {
-            box-shadow: inset -4px -4px 8px var(--shadow-hi), inset 4px 4px 8px var(--shadow-lo);
-            transform: translateY(1px);
+          button.card:active:not(:disabled) {
+            transform: scale(0.985);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+          }
+
+          /* Qora rejimda soya kuchsizroq, chegara esa aniqroq ko'rinsin */
+          .dark-mode .card {
+            box-shadow:
+              0 1px 2px rgba(0, 0, 0, 0.25),
+              0 2px 10px -4px rgba(0, 0, 0, 0.35);
+          }
+          .dark-mode button.card:hover:not(:disabled) {
+            box-shadow:
+              0 2px 6px rgba(0, 0, 0, 0.3),
+              0 10px 24px -8px rgba(0, 0, 0, 0.5);
           }
 
           button:focus-visible,
+          input:focus-visible,
           select:focus-visible,
           a:focus-visible,
           [tabindex]:focus-visible {
@@ -3176,22 +2821,6 @@ function WorkforceAppInner() {
           }
         `}</style>
         {screen}
-        {telegramPromptOpen && (
-          <TelegramPromptModal
-            phase={telegramPromptPhase}
-            busy={telegramLinkBusy}
-            onLink={async () => {
-              setTelegramLinkBusy(true);
-              await linkTelegram();
-              setTelegramLinkBusy(false);
-            }}
-            onSkip={() => {
-              if (telegramPollRef.current) { clearInterval(telegramPollRef.current); telegramPollRef.current = null; }
-              setTelegramPromptOpen(false);
-              setTelegramPromptPhase("prompt");
-            }}
-          />
-        )}
       </div>
     </AppContext.Provider>
   );
